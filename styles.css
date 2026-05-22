@@ -632,7 +632,8 @@ body::after {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  padding-bottom: .12em;
+  padding: 0 0.14em 0.12em 0;
+  margin-right: 0.06em;
   display: inline-block;
 }
 .hero-title .hl { position: relative; white-space: nowrap; }

@@ -223,6 +223,10 @@
     if (!c || prefersReduced) return;
     const ctx = c.getContext('2d');
     let w, h, dpr;
+    let __visible = true;
+    if (typeof IntersectionObserver !== 'undefined') {
+      new IntersectionObserver(es => { __visible = es[0].isIntersecting; }, { threshold: 0 }).observe(c);
+    }
 
     // ---- palettes ----
     const ACCENT = '24, 169, 87';
@@ -682,6 +686,7 @@
 
     // ---- main loop ----
     const tick = () => {
+      if (!__visible) { requestAnimationFrame(tick); return; }
       const now = performance.now();
       ctx.clearRect(0, 0, w, h);
 
@@ -2326,6 +2331,10 @@
   if (!c) return;
   const ctx = c.getContext('2d');
   let dpr = 1, W = 0, H = 0;
+  let __visible = true;
+  if (typeof IntersectionObserver !== 'undefined') {
+    new IntersectionObserver(es => { __visible = es[0].isIntersecting; }, { threshold: 0 }).observe(c);
+  }
 
   const resize = () => {
     dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -2730,6 +2739,38 @@
     ctx.restore();
   };
 
+  // continuous flowing transition dots between every consecutive station
+  const drawFlowDots = (now) => {
+    const DOTS_PER_SEG = 3;
+    const SEG_MS = 1400;            // time for one dot to traverse a segment
+    ctx.save();
+    for (let i = 0; i < STAGES.length - 1; i++) {
+      const a = stationFor(i);
+      const b = stationFor(i + 1);
+      const x1 = a.x + CARD_W / 2;
+      const x2 = b.x - CARD_W / 2;
+      if (x2 <= x1) continue;
+      const col = STAGES[i + 1].color;
+      const isActive = (packet.phase === 'travel' && packet.i === i);
+      for (let k = 0; k < DOTS_PER_SEG; k++) {
+        const phase = ((now / SEG_MS) + k / DOTS_PER_SEG) % 1;
+        const px = x1 + (x2 - x1) * phase;
+        const py = a.y + (b.y - a.y) * phase;
+        const fade = Math.sin(phase * Math.PI);   // fade in & out at endpoints
+        ctx.globalAlpha = (isActive ? 0.55 : 0.28) * fade;
+        ctx.shadowColor = col;
+        ctx.shadowBlur = isActive ? 10 : 4;
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(px, py, isActive ? 3.2 : 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  };
+
   // ===== packet between cards =====
   const drawPacket = () => {
     if (packet.phase !== 'travel') return;
@@ -2770,11 +2811,13 @@
   };
 
   const tick = (now) => {
+    if (!__visible) { lastT = now; requestAnimationFrame(tick); return; }
     if (!lastT) lastT = now;
     const dt = Math.min(80, now - lastT); lastT = now;
 
     ctx.clearRect(0, 0, W, H);
     drawPipe();
+    drawFlowDots(now);
 
     // state machine
     if (packet.phase === 'travel') {
@@ -3975,6 +4018,7 @@
     if (!c) return null;
     const ctx = c.getContext('2d');
     let dpr = 1, W = 0, H = 0;
+    let visible = true;
     const resize = () => {
       dpr = Math.min(2, window.devicePixelRatio || 1);
       const r = c.getBoundingClientRect();
@@ -3985,9 +4029,12 @@
       if (sizer) sizer(W, H);
     };
     if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(c);
+    if (typeof IntersectionObserver !== 'undefined') {
+      new IntersectionObserver(es => { visible = es[0].isIntersecting; }, { threshold: 0 }).observe(c);
+    }
     window.addEventListener('resize', resize);
     resize();
-    return { c, ctx, get W(){ return W; }, get H(){ return H; } };
+    return { c, ctx, get W(){ return W; }, get H(){ return H; }, get visible(){ return visible; } };
   };
 
   window.__roundRect = (ctx, x, y, w, h, r) => {
@@ -4081,6 +4128,7 @@
   const phase = () => PHASES[ph];
 
   const tick = (now) => {
+    if (!cv.visible) { last = now; t0 = now; requestAnimationFrame(tick); return; }
     if (!last) { last = now; t0 = now; }
     last = now;
     advance(now);
@@ -4364,6 +4412,7 @@
   const fmt = (v) => Math.round(v).toString();
 
   const tick = (now) => {
+    if (!cv.visible) { last = now; st.t0 = now; requestAnimationFrame(tick); return; }
     if (!last) { last = now; st.t0 = now; }
     last = now;
     advance(now);
@@ -4619,6 +4668,7 @@
   };
 
   const tick = (now) => {
+    if (!cv.visible) { last = now; t0 = now; requestAnimationFrame(tick); return; }
     if (!last) { last = now; t0 = now; }
     last = now;
     advance(now);
