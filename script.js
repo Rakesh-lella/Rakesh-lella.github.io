@@ -250,6 +250,8 @@
     let leakCount = 0;
     let stealthKills = 0;
     let bugsSpawned = 0;
+    let devKills = 0;     // bugs caught by dev-owned unit tests
+    let qaKills = 0;      // bugs caught by QA (QA env, STAGE gate, sentinels, manual cursor)
 
     let mx = -9999, my = -9999;
     let mLast = { x: 0, y: 0, t: 0 };
@@ -268,9 +270,10 @@
       gates = [
         // p = kill probability for *non-stealth* bugs;
         // stealthP = override for stealth bugs (lower = more survive)
-        { x: W * 0.38, label: 'UNIT',   p: 0.20, stealthP: 0.15, color: '#0ea5e9' },
-        { x: W * 0.60, label: 'QA ENV', p: 1.00, stealthP: 0.55, color: '#f97316' },
-        { x: W * 0.80, label: 'STAGE',  p: 1.00, stealthP: 1.00, color: '#a855f7' }
+        // owner: 'dev' (unit tests, written by devs) | 'qa' (QA-owned envs)
+        { x: W * 0.38, label: 'UNIT',   caption: 'DEV UNIT TESTS', owner: 'dev', p: 0.20, stealthP: 0.15, color: '#0ea5e9' },
+        { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 1.00, stealthP: 0.55, color: '#f97316' },
+        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 1.00, stealthP: 1.00, color: '#a855f7' }
       ];
       // devs at left edge (3 workstations)
       const devY = [H * 0.30, H * 0.55, H * 0.78];
@@ -351,11 +354,11 @@
       for (const b of bugs) {
         if (b.state !== 'crawling') continue;
         const dx = b.x - e.clientX, dy = b.y - e.clientY;
-        if (dx*dx + dy*dy < 110*110) killBug(b, 'squash');
+        if (dx*dx + dy*dy < 110*110) killBug(b, 'squash', null, 'qa');
       }
     });
 
-    const killBug = (b, mode, color) => {
+    const killBug = (b, mode, color, owner) => {
       if (b.state !== 'crawling') return;
       b.state = 'dying';
       b.dieT = performance.now();
@@ -378,7 +381,12 @@
         });
       }
       if (mode === 'leak') { prodFlashT = performance.now(); leakCount++; }
-      else { killCount++; if (b.stealth) stealthKills++; }
+      else {
+        killCount++;
+        if (b.stealth) stealthKills++;
+        if (owner === 'dev') devKills++;
+        else qaKills++;
+      }
     };
 
     // ---- bug drawers ----
@@ -692,10 +700,11 @@
         // label
         ctx.fillStyle = '#ffffff';
         ctx.fillText(txt, px + 8, py + 13);
-        // small "GATE" caption below
-        ctx.fillStyle = g.color + 'aa';
-        ctx.font = '600 8px ui-monospace, "JetBrains Mono", monospace';
-        ctx.fillText('TEST GATE', g.x - 23, py + 30);
+        // small caption below pill (per-gate)
+        ctx.fillStyle = g.color + 'cc';
+        ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
+        const ctw = ctx.measureText(g.caption).width;
+        ctx.fillText(g.caption, g.x - ctw / 2, py + 32);
         ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
         ctx.setLineDash([6, 6]);
       }
@@ -750,7 +759,7 @@
                 x2: target.x, y2: target.y,
                 t0: now, life: 180, color: s.color
               });
-              killBug(target, 'laser', s.color);
+              killBug(target, 'laser', s.color, 'qa');
               s.lastFire = now;
               s.charge = 0;
             }
@@ -775,13 +784,13 @@
           b.y += b.vy + w2;
           b.vy += ((h * 0.55 - b.y) * 0.00002);
 
-          // cursor squash
+          // cursor squash (counts as QA — you, the QA engineer, did it)
           if (mx > -9000) {
             const dx = b.x - mx, dy = b.y - my;
-            if (dx*dx + dy*dy < SQUASH_R * SQUASH_R) killBug(b, 'squash');
+            if (dx*dx + dy*dy < SQUASH_R * SQUASH_R) killBug(b, 'squash', null, 'qa');
           }
 
-          // gates: stage-specific kill probabilities (UNIT/QA/STAGE)
+          // gates: stage-specific kill probabilities; attribute to owner
           for (const g of gates) {
             if (b.state !== 'crawling') break;
             if (!b.passedGates.has(g.label) && b.x >= g.x && b.x <= g.x + b.vx + 1) {
@@ -798,7 +807,7 @@
                     color: g.color, size: 1.7
                   });
                 }
-                killBug(b, 'zap', g.color);
+                killBug(b, 'zap', g.color, g.owner);
               }
             }
           }
@@ -915,21 +924,26 @@
         ctx.setLineDash([]);
       }
 
-      // ---- HUD (bottom-right pill stack, away from CTAs) ----
-      const hudW = 200, hudH = 72;
-      // place vertically between sentinel 2 and 3, just left of PROD line
-      const hudX = prodX - hudW - 18, hudY = h * 0.66;
+      // ---- HUD (kill attribution) ----
+      const hudW = 220, hudH = 90;
+      const hudX = prodX - hudW - 18, hudY = h * 0.64;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.82)';
       ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 10); ctx.fill();
       ctx.strokeStyle = `rgba(${INK}, 0.10)`; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 10); ctx.stroke();
       ctx.font = '700 10px ui-monospace, "JetBrains Mono", monospace';
+      // dev unit-test kills (blue)
+      ctx.fillStyle = 'rgba(14, 165, 233, 0.95)';
+      ctx.fillText(`⚙ caught by devs (unit): ${devKills}`, hudX + 12, hudY + 18);
+      // QA kills (emerald)
       ctx.fillStyle = `rgba(${ACCENT}, 0.95)`;
-      ctx.fillText(`● bugs squashed: ${killCount}`, hudX + 12, hudY + 18);
+      ctx.fillText(`● caught by QA:          ${qaKills}`, hudX + 12, hudY + 38);
+      // stealth (purple)
       ctx.fillStyle = `rgba(168, 85, 247, 0.95)`;
-      ctx.fillText(`◆ stealth caught: ${stealthKills}`, hudX + 12, hudY + 38);
+      ctx.fillText(`◆ stealth bugs caught:   ${stealthKills}`, hudX + 12, hudY + 58);
+      // leaked (coral)
       ctx.fillStyle = `rgba(${FAIL}, ${leakCount > 0 ? 0.95 : 0.65})`;
-      ctx.fillText(`✖ leaked to prod: ${leakCount}`, hudX + 12, hudY + 58);
+      ctx.fillText(`✖ leaked to prod:        ${leakCount}`, hudX + 12, hudY + 78);
 
       requestAnimationFrame(tick);
     };
