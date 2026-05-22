@@ -206,7 +206,7 @@ body.loading { overflow: hidden; }
   border: 1px solid rgba(10,10,12,0.08);
 }
 #work .container { position: relative; z-index: 1; }
-.card-canvas-tall { height: 280px !important; }
+.card-canvas-tall { height: 380px !important; }
 .stack-canvas, .journey-canvas { display: none; }
 #stack { padding-top: clamp(72px, 10vh, 110px); }
 #journey { padding-top: clamp(72px, 10vh, 110px); }
@@ -244,7 +244,7 @@ body.loading { overflow: hidden; }
   width: 100%;
   height: 260px;
 }
-.bento-card.bento-full.has-preview .card-canvas.card-canvas-tall { height: 300px !important; }
+.bento-card.bento-full.has-preview .card-canvas.card-canvas-tall { height: 380px !important; }
 @media (max-width: 860px) {
   .bento-card.bento-full.has-preview { padding: 22px; }
   .bento-card.bento-full.has-preview .card-canvas { height: 220px; }

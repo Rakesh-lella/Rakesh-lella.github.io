@@ -279,21 +279,23 @@
         { x: W * 0.38, label: 'UNIT',   caption: 'DEV UNIT TESTS', owner: 'dev', p: 0.12, stealthP: 0.08, color: '#0ea5e9' },
         // QA ENV: ~half of non-stealth bugs survive past the line so the user can also squash them
         { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 0.55, stealthP: 0.20, color: '#f97316' },
-        // STAGE: catches most of what is left, but a few stealth bugs slip past for sentinels
-        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 0.85, stealthP: 0.50, color: '#a855f7' }
+        // STAGE: catches most of what is left, but ~half the invisible bugs slip past for sentinels
+        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 0.85, stealthP: 0.45, color: '#a855f7' }
       ];
-      // devs at left edge (3 workstations)
-      const devY = [H * 0.30, H * 0.55, H * 0.78];
+      // devs at left edge (3 workstations) — each with a visible name tag
+      const devY = [H * 0.22, H * 0.46, H * 0.70];
       const devColors = [
         { shirt: '#2563eb', hair: '#1e293b', skin: '#fcd9b6' },
         { shirt: '#10b981', hair: '#7c2d12', skin: '#fde2b8' },
         { shirt: '#ef4444', hair: '#0a0a0c', skin: '#f7d1a8' }
       ];
+      const devNames = ['Aarav', 'Priya', 'Jin'];
       devs = [];
       for (let i = 0; i < 3; i++) {
         devs.push({
           x: 78, y: devY[i],
           color: devColors[i],
+          name: devNames[i],
           typePhase: Math.random() * Math.PI * 2,
           spawnT: 0,
           screenGlow: 0
@@ -337,7 +339,7 @@
         dieT: 0,
         passedGates: new Set(),
         targeted: false,
-        stealth: Math.random() < 0.32
+        stealth: Math.random() < 0.45
       });
     };
 
@@ -689,6 +691,19 @@
       // keyboard hint (under monitor)
       ctx.fillStyle = '#1f2937';
       ctx.fillRect(x + 2, y + 23, 22, 2);
+      // dev name tag below the workstation
+      if (d.name) {
+        ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+        const tw = ctx.measureText(d.name).width + 10;
+        const tx = x + 14 - tw / 2;
+        const ty = y + 28;
+        ctx.fillStyle = 'rgba(10, 12, 18, 0.78)';
+        ctx.beginPath(); ctx.roundRect(tx, ty, tw, 12, 3); ctx.fill();
+        ctx.fillStyle = d.color.shirt;
+        ctx.fillRect(tx, ty, 2, 12);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(d.name, tx + 6, ty + 9);
+      }
       ctx.restore();
     };
 
@@ -906,19 +921,45 @@
             killBug(b, 'leak');
           }
 
-          // render — stealth bugs are faint, with a subtle dashed outline
+          // render — stealth bugs are visibly ghostly + labeled INVISIBLE
           if (b.stealth) {
-            ctx.globalAlpha = 0.38;
+            // soft pulsing halo to telegraph "ghost" state
+            const pulse = 0.55 + 0.45 * Math.sin(now / 220 + b.phase);
+            const haloR = b.size * 2.4;
+            const grd = ctx.createRadialGradient(b.x, b.y, 1, b.x, b.y, haloR);
+            grd.addColorStop(0, `rgba(168, 85, 247, ${0.20 + pulse * 0.18})`);
+            grd.addColorStop(1, 'rgba(168, 85, 247, 0)');
+            ctx.fillStyle = grd;
+            ctx.beginPath(); ctx.arc(b.x, b.y, haloR, 0, Math.PI * 2); ctx.fill();
+            // faint body
+            ctx.globalAlpha = 0.32;
             DRAWERS[b.species](b, now);
             ctx.globalAlpha = 1;
-            // hint outline (very subtle, dashed)
-            ctx.setLineDash([2, 3]);
-            ctx.strokeStyle = `rgba(${INK}, 0.18)`;
-            ctx.lineWidth = 0.8;
+            // dashed outline ring, purple, animated
+            ctx.setLineDash([3, 3]);
+            ctx.lineDashOffset = -now / 90;
+            ctx.strokeStyle = `rgba(168, 85, 247, 0.85)`;
+            ctx.lineWidth = 1.2;
             ctx.beginPath();
             ctx.arc(b.x, b.y, b.size * 1.9, 0, Math.PI * 2);
             ctx.stroke();
             ctx.setLineDash([]);
+            ctx.lineDashOffset = 0;
+            // floating "INVISIBLE BUG" tag above
+            const tagX = b.x, tagY = b.y - b.size * 1.9 - 12;
+            ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
+            const tw = ctx.measureText('👻 INVISIBLE').width + 10;
+            ctx.fillStyle = 'rgba(168, 85, 247, 0.95)';
+            ctx.beginPath(); ctx.roundRect(tagX - tw / 2, tagY - 8, tw, 12, 3); ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.fillText('👻 INVISIBLE', tagX, tagY + 1);
+            ctx.textAlign = 'start';
+            // pointer triangle
+            ctx.fillStyle = 'rgba(168, 85, 247, 0.95)';
+            ctx.beginPath();
+            ctx.moveTo(tagX - 3, tagY + 4); ctx.lineTo(tagX + 3, tagY + 4); ctx.lineTo(tagX, tagY + 7); ctx.closePath();
+            ctx.fill();
           } else {
             DRAWERS[b.species](b, now);
           }
@@ -1012,26 +1053,30 @@
         ctx.setLineDash([]);
       }
 
-      // ---- HUD (kill attribution) ----
-      const hudW = 268, hudH = 110;
-      const hudX = prodX - hudW - 18, hudY = h * 0.60;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+      // ---- HUD (kill attribution) — bottom-left, glass card, kept clear of QA sentinels on the right ----
+      const hudW = 248, hudH = 100;
+      const hudX = 14, hudY = h - hudH - 14;
+      ctx.save();
+      // glass background (semi-transparent dark, subtle border, NO solid fill so QA sentinels stay readable)
+      ctx.fillStyle = 'rgba(10, 12, 18, 0.42)';
       ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 12); ctx.fill();
-      ctx.strokeStyle = `rgba(${INK}, 0.12)`; ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+      ctx.lineWidth = 1;
       ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 12); ctx.stroke();
       ctx.font = '700 12px ui-monospace, "JetBrains Mono", monospace';
-      // dev unit-test kills (blue)
-      ctx.fillStyle = 'rgba(14, 165, 233, 0.95)';
-      ctx.fillText(`⚙ caught by devs (unit): ${devKills}`, hudX + 14, hudY + 24);
+      // dev unit-test kills (cyan)
+      ctx.fillStyle = 'rgba(125, 211, 252, 0.95)';
+      ctx.fillText(`⚙ caught by devs (unit): ${devKills}`, hudX + 14, hudY + 22);
       // QA kills (emerald)
-      ctx.fillStyle = `rgba(${ACCENT}, 0.95)`;
-      ctx.fillText(`● caught by QA:          ${qaKills}`, hudX + 14, hudY + 47);
+      ctx.fillStyle = `rgba(74, 222, 128, 0.95)`;
+      ctx.fillText(`● caught by QA:          ${qaKills}`, hudX + 14, hudY + 43);
       // stealth (purple)
-      ctx.fillStyle = `rgba(168, 85, 247, 0.95)`;
-      ctx.fillText(`◆ stealth bugs caught:   ${stealthKills}`, hudX + 14, hudY + 70);
+      ctx.fillStyle = `rgba(196, 181, 253, 0.95)`;
+      ctx.fillText(`👻 invisible bugs caught: ${stealthKills}`, hudX + 14, hudY + 64);
       // leaked (coral)
-      ctx.fillStyle = `rgba(${FAIL}, ${leakCount > 0 ? 0.95 : 0.65})`;
-      ctx.fillText(`✖ leaked to prod:        ${leakCount}`, hudX + 14, hudY + 93);
+      ctx.fillStyle = `rgba(252, 165, 165, ${leakCount > 0 ? 0.95 : 0.65})`;
+      ctx.fillText(`✖ leaked to prod:        ${leakCount}`, hudX + 14, hudY + 85);
+      ctx.restore();
 
       requestAnimationFrame(tick);
     };
@@ -2354,23 +2399,29 @@
   }
 
   // ---- pipeline layout constants (used inside resize) ----
-  const SAFE_LEFT  = 0.045;
-  const SAFE_RIGHT = 0.955;
+  const SAFE_LEFT  = 0.08;
+  const SAFE_RIGHT = 0.92;
   const MIN_GAP    = 36;        // min visible gap between card edges
   let   CARD_W     = 124;
   const CARD_H     = 100;
-  const CARD_Y     = 76;        // vertical center of card row (above the section-head)
+  // two rows: row 1 (i=0..3) at CARD_Y1, row 2 (i=4..6) at CARD_Y2
+  const CARD_Y1    = 80;
+  const CARD_Y2    = 230;
+  const ROW1_COUNT = 4;
 
   const resize = () => {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     const r = c.getBoundingClientRect();
     W = Math.max(360, r.width);
-    H = Math.max(280, r.height);
+    H = Math.max(340, r.height);   // taller — two rows of cards
     c.width = W * dpr; c.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // recompute card width so there's a visible gap (>= MIN_GAP) between stations
-    const segGap = (W * (SAFE_RIGHT - SAFE_LEFT)) / 6;   // 7 stations -> 6 gaps
-    CARD_W = Math.max(70, Math.min(124, segGap - MIN_GAP));
+    // sized so both rows have visible gaps (use the row with smallest gap)
+    const usable = W * (SAFE_RIGHT - SAFE_LEFT);
+    const gap1   = usable / Math.max(1, ROW1_COUNT - 1);                // 4 stations -> 3 gaps
+    const gap2   = usable / Math.max(1, (7 - ROW1_COUNT) - 1 || 1);     // 3 stations -> 2 gaps
+    const segGap = Math.min(gap1, gap2);
+    CARD_W = Math.max(72, Math.min(132, segGap - MIN_GAP));
   };
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(c);
   window.addEventListener('resize', resize);
@@ -2398,8 +2449,17 @@
   })();
 
   const stationFor = (i) => {
-    const f = SAFE_LEFT + (SAFE_RIGHT - SAFE_LEFT) * (i / (STAGES.length - 1));
-    return { x: W * f, y: CARD_Y, ...STAGES[i] };
+    // row 0 covers indices 0..ROW1_COUNT-1, row 1 covers the remainder
+    const inRow1 = i < ROW1_COUNT;
+    const row    = inRow1 ? 0 : 1;
+    const idx    = inRow1 ? i : (i - ROW1_COUNT);
+    const count  = inRow1 ? ROW1_COUNT : (STAGES.length - ROW1_COUNT);
+    const span   = SAFE_RIGHT - SAFE_LEFT;
+    const f      = count <= 1
+      ? (SAFE_LEFT + span * 0.5)
+      : (SAFE_LEFT + span * (idx / (count - 1)));
+    const y      = row === 0 ? CARD_Y1 : CARD_Y2;
+    return { x: W * f, y, row, ...STAGES[i] };
   };
 
   // ----- frame helpers -----
@@ -2744,6 +2804,40 @@
     ctx.restore();
   };
 
+  // ----- segment geometry between station i and i+1 -----
+  // Same-row segments are straight; row-jumps trace a clear Manhattan polyline:
+  //   (x1, y1) -> (x1, midY) -> (x2, midY) -> (x2, y2)
+  // This makes the inter-row connector unmistakably "down, across, down".
+  const segmentPoint = (i, t) => {
+    const a = stationFor(i);
+    const b = stationFor(i + 1);
+    const x1 = a.x + CARD_W / 2;
+    const x2 = b.x - CARD_W / 2;
+    if (a.row === b.row) {
+      return { x: x1 + (x2 - x1) * t, y: a.y + (b.y - a.y) * t };
+    }
+    // for row jumps: start from BOTTOM of last card, finish at TOP of next card
+    const startX = a.x;
+    const startY = a.y + CARD_H / 2;
+    const endX   = b.x;
+    const endY   = b.y - CARD_H / 2;
+    const midY   = (startY + endY) / 2;
+    const L1 = Math.abs(midY - startY);
+    const L2 = Math.abs(startX - endX);
+    const L3 = Math.abs(endY - midY);
+    const total = L1 + L2 + L3 || 1;
+    const d = t * total;
+    if (d < L1) {
+      return { x: startX, y: startY + (midY - startY) * (d / L1) };
+    } else if (d < L1 + L2) {
+      const k = (d - L1) / L2;
+      return { x: startX + (endX - startX) * k, y: midY };
+    } else {
+      const k = (d - L1 - L2) / L3;
+      return { x: endX, y: midY + (endY - midY) * k };
+    }
+  };
+
   // ===== pipe between cards (only the visible gap, not under the card) =====
   const drawPipe = () => {
     ctx.save();
@@ -2755,10 +2849,18 @@
       const b = stationFor(i + 1);
       const x1 = a.x + CARD_W / 2;
       const x2 = b.x - CARD_W / 2;
-      if (x2 > x1) {
-        ctx.beginPath();
-        ctx.moveTo(x1, a.y);
-        ctx.lineTo(x2, b.y);
+      ctx.beginPath();
+      if (a.row === b.row) {
+        if (x2 > x1) { ctx.moveTo(x1, a.y); ctx.lineTo(x2, b.y); ctx.stroke(); }
+      } else {
+        // row jump: trace polyline (start at bottom of a, end at top of b)
+        const p0 = segmentPoint(i, 0);
+        ctx.moveTo(p0.x, p0.y);
+        const N = 36;
+        for (let k = 1; k <= N; k++) {
+          const p = segmentPoint(i, k / N);
+          ctx.lineTo(p.x, p.y);
+        }
         ctx.stroke();
       }
     }
@@ -2772,24 +2874,22 @@
     const SEG_MS = 1400;            // time for one dot to traverse a segment
     ctx.save();
     for (let i = 0; i < STAGES.length - 1; i++) {
-      const a = stationFor(i);
-      const b = stationFor(i + 1);
-      const x1 = a.x + CARD_W / 2;
-      const x2 = b.x - CARD_W / 2;
-      if (x2 <= x1) continue;
       const col = STAGES[i + 1].color;
       const isActive = (packet.phase === 'travel' && packet.i === i);
+      const a = stationFor(i);
+      const b = stationFor(i + 1);
+      // jumps need a slower dot speed because the path is longer
+      const segMs = (a.row === b.row) ? SEG_MS : SEG_MS * 1.7;
       for (let k = 0; k < DOTS_PER_SEG; k++) {
-        const phase = ((now / SEG_MS) + k / DOTS_PER_SEG) % 1;
-        const px = x1 + (x2 - x1) * phase;
-        const py = a.y + (b.y - a.y) * phase;
-        const fade = Math.sin(phase * Math.PI);   // fade in & out at endpoints
+        const phase = ((now / segMs) + k / DOTS_PER_SEG) % 1;
+        const p = segmentPoint(i, phase);
+        const fade = Math.sin(phase * Math.PI);
         ctx.globalAlpha = (isActive ? 0.55 : 0.28) * fade;
         ctx.shadowColor = col;
         ctx.shadowBlur = isActive ? 10 : 4;
         ctx.fillStyle = col;
         ctx.beginPath();
-        ctx.arc(px, py, isActive ? 3.2 : 2.4, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, isActive ? 3.2 : 2.4, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -2802,35 +2902,30 @@
   const drawPacket = () => {
     if (packet.phase !== 'travel') return;
     if (packet.i >= STAGES.length - 1) return;
-    const a = stationFor(packet.i);
     const b = stationFor(packet.i + 1);
-    const x1 = a.x + CARD_W / 2;
-    const x2 = b.x - CARD_W / 2;
     const t = packet.t;
     const e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
-    const px = x1 + (x2 - x1) * e;
-    const py = a.y + (b.y - a.y) * e;
+    const p = segmentPoint(packet.i, e);
     ctx.save();
     ctx.shadowColor = b.color;
     ctx.shadowBlur = 18;
     ctx.fillStyle = b.color;
     ctx.beginPath();
-    ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 1.8, 0, Math.PI * 2);
     ctx.fill();
     // trailing sparks
     for (let k = 1; k <= 4; k++) {
       const tk = Math.max(0, e - k * 0.05);
-      const tx = x1 + (x2 - x1) * tk;
-      const ty = a.y + (b.y - a.y) * tk;
+      const sp = segmentPoint(packet.i, tk);
       ctx.globalAlpha = (4 - k) / 6;
       ctx.fillStyle = b.color;
       ctx.beginPath();
-      ctx.arc(tx, ty, 2.6 - k * 0.4, 0, Math.PI * 2);
+      ctx.arc(sp.x, sp.y, 2.6 - k * 0.4, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
