@@ -14,16 +14,7 @@
 
   // ===== year =====
   const yearEl = $('#year'); if (yearEl) yearEl.textContent = new Date().getFullYear();
-
-  // ===== theme =====
   const root = document.documentElement;
-  const themeStored = ls.get('rl-theme', null);
-  if (themeStored) root.setAttribute('data-theme', themeStored);
-  $('#theme-toggle')?.addEventListener('click', () => {
-    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    root.setAttribute('data-theme', next);
-    ls.set('rl-theme', next);
-  });
 
   // ===== mobile nav =====
   const nav = $('#nav');
@@ -119,38 +110,37 @@
         r: (Math.random() * 1.2 + 0.6) * dpr
       }));
     };
-    const accent = () => getComputedStyle(root).getPropertyValue('--accent').trim() || '#10ffa0';
+    // ink dots on white background
+    const dotCol = 'rgba(10,10,12,1)';
+    const lineCol = 'rgba(10,10,12,1)';
     let mx2 = -9999, my2 = -9999;
     window.addEventListener('mousemove', e => { mx2 = e.clientX * dpr; my2 = e.clientY * dpr; }, { passive: true });
     const tick = () => {
       ctx.clearRect(0, 0, w, h);
-      const col = accent();
       for (const p of parts) {
         p.x += p.vx; p.y += p.vy;
         if (p.x < 0 || p.x > w) p.vx *= -1;
         if (p.y < 0 || p.y > h) p.vy *= -1;
-        ctx.beginPath(); ctx.fillStyle = col; ctx.globalAlpha = .55;
+        ctx.beginPath(); ctx.fillStyle = dotCol; ctx.globalAlpha = .28;
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
       }
-      // links
       ctx.lineWidth = 1 * dpr;
       for (let i = 0; i < parts.length; i++) {
         for (let j = i + 1; j < parts.length; j++) {
           const a = parts[i], b = parts[j];
           const dx = a.x - b.x, dy = a.y - b.y, d = dx * dx + dy * dy;
-          const max = 120 * dpr * 120 * dpr;
+          const max = 130 * dpr * 130 * dpr;
           if (d < max) {
-            ctx.globalAlpha = (1 - d / max) * 0.25;
-            ctx.strokeStyle = col;
+            ctx.globalAlpha = (1 - d / max) * 0.12;
+            ctx.strokeStyle = lineCol;
             ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
           }
         }
-        // mouse link
         const dxm = parts[i].x - mx2, dym = parts[i].y - my2, dm = dxm * dxm + dym * dym;
-        const maxM = 160 * dpr * 160 * dpr;
+        const maxM = 180 * dpr * 180 * dpr;
         if (dm < maxM) {
-          ctx.globalAlpha = (1 - dm / maxM) * 0.35;
-          ctx.strokeStyle = col;
+          ctx.globalAlpha = (1 - dm / maxM) * 0.22;
+          ctx.strokeStyle = 'rgba(24,169,87,1)';
           ctx.beginPath(); ctx.moveTo(parts[i].x, parts[i].y); ctx.lineTo(mx2, my2); ctx.stroke();
         }
       }
@@ -513,13 +503,13 @@
       const W = chart.clientWidth, H = chart.clientHeight;
       chart.width = W * dpr; chart.height = H * dpr; ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, W, H);
-      const accent = getComputedStyle(root).getPropertyValue('--accent').trim() || '#10ffa0';
-      const border = getComputedStyle(root).getPropertyValue('--border').trim() || '#1a1f2a';
+      const accent = getComputedStyle(root).getPropertyValue('--accent').trim() || '#18a957';
+      const border = getComputedStyle(root).getPropertyValue('--line').trim() || '#e6e3da';
       // axes
       ctx.strokeStyle = border; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(30, 10); ctx.lineTo(30, H - 20); ctx.lineTo(W - 10, H - 20); ctx.stroke();
       // gridlines + labels
-      ctx.fillStyle = getComputedStyle(root).getPropertyValue('--fg-mute').trim() || '#6e7787';
+      ctx.fillStyle = getComputedStyle(root).getPropertyValue('--muted').trim() || '#6b6b73';
       ctx.font = '10px JetBrains Mono, monospace';
       for (let p = 0; p <= 100; p += 25) {
         const y = H - 20 - (p / 100) * (H - 30);
