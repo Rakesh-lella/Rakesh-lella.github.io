@@ -2441,46 +2441,59 @@
   }
 
   // ---- pipeline layout constants (used inside resize) ----
-  // SAFE_* are computed dynamically in resize() so cards never overflow the canvas on mobile.
+  // SAFE_* and per-row Y positions are computed dynamically in resize() so cards never overflow on mobile.
   let SAFE_LEFT  = 0.08;
   let SAFE_RIGHT = 0.92;
   const MIN_GAP    = 28;        // min visible gap between card edges
   let   CARD_W     = 124;
-  const CARD_H     = 100;
-  // two rows: row 1 (i=0..3) at CARD_Y1, row 2 (i=4..6) at CARD_Y2
-  let   CARD_Y1    = 80;
-  let   CARD_Y2    = 230;
-  const ROW1_COUNT = 4;
+  let   CARD_H     = 100;
+  // row layout — recomputed every resize. On mobile we drop to 2 cards per row.
+  let   COLS_PER_ROW = 4;
+  let   TOTAL_ROWS   = 2;
+  let   ROW_Y        = [80, 230];   // y center of each row
+  // STAGES is defined just below — predeclare length for resize() use
+  const STAGES_LEN = 7;
 
   const resize = () => {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     const r = c.getBoundingClientRect();
     W = Math.max(320, r.width);
-    H = Math.max(340, r.height);   // taller — two rows of cards
-    c.width = W * dpr; c.height = H * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // mobile-aware sizing: shrink card on narrow widths
     const isMobile = W < 560;
-    const maxCardW = isMobile ? 96 : 152;
-    const minCardW = isMobile ? 64 : 86;
 
-    // first pass: pick CARD_W from the row with the smallest available per-card slot
-    const STAGES_LEN = 7; // QA, git, GitHub, CI, Tests, Deploy, Production
+    // 2 cards per row on phones, 4 on desktop
+    COLS_PER_ROW = isMobile ? 2 : 4;
+    TOTAL_ROWS   = Math.ceil(STAGES_LEN / COLS_PER_ROW);
+
+    // card sizing — slightly smaller cards on mobile so 2 fit + gap
+    const maxCardW = isMobile ? 140 : 152;
+    const minCardW = isMobile ? 110 : 86;
+    CARD_H = 100;
+
     const usable0 = W * 0.86;
-    const gap1    = usable0 / Math.max(1, ROW1_COUNT - 1);
-    const gap2    = usable0 / Math.max(1, (STAGES_LEN - ROW1_COUNT) - 1 || 1);
-    const segGap  = Math.min(gap1, gap2);
+    const segGap  = usable0 / Math.max(1, COLS_PER_ROW - 1);
     CARD_W = Math.max(minCardW, Math.min(maxCardW, segGap - MIN_GAP));
 
-    // then recompute SAFE bounds so cards never clip canvas edges
+    // SAFE bounds so cards never clip canvas edges
     const margin = CARD_W / 2 + 8;
     SAFE_LEFT  = margin / W;
     SAFE_RIGHT = 1 - margin / W;
 
-    // row y positions: top margin + a clear vertical gap between rows
-    CARD_Y1 = CARD_H / 2 + (isMobile ? 18 : 28);
-    CARD_Y2 = CARD_Y1 + CARD_H + (isMobile ? 36 : 52);
+    // row y positions
+    const topPad  = isMobile ? 16 : 28;
+    const rowGap  = isMobile ? 30 : 52;
+    const botPad  = isMobile ? 14 : 24;
+    ROW_Y = [];
+    for (let row = 0; row < TOTAL_ROWS; row++) {
+      ROW_Y.push(topPad + CARD_H / 2 + row * (CARD_H + rowGap));
+    }
+    const neededH = topPad + TOTAL_ROWS * CARD_H + (TOTAL_ROWS - 1) * rowGap + botPad;
+    H = Math.max(neededH, r.height || neededH);
+    // explicitly size the canvas element so CSS height matches what we need
+    c.style.setProperty('height', neededH + 'px', 'important');
+    c.width = W * dpr; c.height = neededH * dpr;
+    H = neededH;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(c);
   window.addEventListener('resize', resize);
@@ -2498,8 +2511,8 @@
 
   let packet = { i: 0, t: 0, phase: 'travel', dwellStart: 0, restartAt: 0 };
   let lastT = 0;
-  const PACKET_SPEED = 0.35;
-  const DWELL = 2400;       // ms per station — long enough for the body animation to fully complete before transition
+  const PACKET_SPEED = 0.32;
+  const DWELL = 3000;       // ms per station — long enough for the body animation to fully complete before transition
   const PAUSE_AFTER_LOOP = 1600;
 
   const SAFE_LEFT_DUP_REMOVED = (() => {
@@ -2508,16 +2521,16 @@
   })();
 
   const stationFor = (i) => {
-    // row 0 covers indices 0..ROW1_COUNT-1, row 1 covers the remainder
-    const inRow1 = i < ROW1_COUNT;
-    const row    = inRow1 ? 0 : 1;
-    const idx    = inRow1 ? i : (i - ROW1_COUNT);
-    const count  = inRow1 ? ROW1_COUNT : (STAGES.length - ROW1_COUNT);
-    const span   = SAFE_RIGHT - SAFE_LEFT;
-    const f      = count <= 1
+    // generic row/col layout — works for 2-per-row mobile and 4-per-row desktop
+    const row   = Math.floor(i / COLS_PER_ROW);
+    const col   = i % COLS_PER_ROW;
+    const start = row * COLS_PER_ROW;
+    const inRow = Math.min(COLS_PER_ROW, STAGES_LEN - start);
+    const span  = SAFE_RIGHT - SAFE_LEFT;
+    const f     = inRow <= 1
       ? (SAFE_LEFT + span * 0.5)
-      : (SAFE_LEFT + span * (idx / (count - 1)));
-    const y      = row === 0 ? CARD_Y1 : CARD_Y2;
+      : (SAFE_LEFT + span * (col / (inRow - 1)));
+    const y     = ROW_Y[row] || ROW_Y[ROW_Y.length - 1];
     return { x: W * f, y, row, ...STAGES[i] };
   };
 
