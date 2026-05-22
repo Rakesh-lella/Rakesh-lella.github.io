@@ -292,14 +292,14 @@
           screenGlow: 0
         });
       }
-      // 3 sentinels in front of STAGE gate (not PROD)
-      const stageX = W * 0.80;
+      // 3 sentinels stand right in front of PROD line, guarding production
+      const prodX = W * PROD_X_FRAC;
       const sentY = [H * 0.28, H * 0.55, H * 0.80];
       const sentColor = ['#0ea5e9', '#18a957', '#f97316'];
       sentinels.length = 0;
       for (let i = 0; i < 3; i++) {
         sentinels.push({
-          x: stageX - 30, y: sentY[i],
+          x: prodX - 34, y: sentY[i],
           color: sentColor[i], aim: Math.PI,
           lastFire: 0, charge: 0
         });
@@ -743,7 +743,7 @@
           if (b.x > prodX - 8) continue;
           const dx = b.x - s.x, dy = b.y - s.y;
           const d = dx*dx + dy*dy;
-          if (d < bestD && d < 380 * 380) { bestD = d; target = b; }
+          if (d < bestD && d < 620 * 620) { bestD = d; target = b; }
         }
         if (target) {
           const desired = Math.atan2(target.y - s.y, target.x - s.x);
