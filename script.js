@@ -2509,7 +2509,7 @@
     { key: 'prod',   label: 'Prod',       caption: 'live',        color: '#0a6f3a', icon: '☁' }
   ];
 
-  let packet = { i: 0, t: 0, phase: 'travel', dwellStart: 0, restartAt: 0 };
+  let packet = { i: 0, t: 0, phase: 'dwell', dwellStart: performance.now(), restartAt: 0 };
   let lastT = 0;
   const PACKET_SPEED = 0.32;
   const DWELL = 3000;       // ms per station — long enough for the body animation to fully complete before transition
@@ -3059,7 +3059,8 @@
       if (now > packet.restartAt) {
         packet.i = 0;
         packet.t = 0;
-        packet.phase = 'travel';
+        packet.phase = 'dwell';
+        packet.dwellStart = now;
       }
     }
 
