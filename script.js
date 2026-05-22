@@ -248,6 +248,7 @@
     let prodFlashT = 0;
     let killCount = 0;
     let leakCount = 0;
+    let stealthKills = 0;
 
     let mx = -9999, my = -9999;
     let mLast = { x: 0, y: 0, t: 0 };
@@ -263,8 +264,8 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       w = W; h = H;
       gates = [
-        { x: W * 0.42, label: 'UNIT', p: 0.35, lastArc: 0 },
-        { x: W * 0.68, label: 'E2E',  p: 0.45, lastArc: 0 }
+        { x: W * 0.42, label: 'UNIT', p: 0.35, color: '#0ea5e9', lastArc: 0 },
+        { x: W * 0.68, label: 'E2E',  p: 0.45, color: '#f97316', lastArc: 0 }
       ];
       // 3 sentinels along PROD line (positioned just left of PROD line)
       const prodX = W * PROD_X_FRAC;
@@ -301,7 +302,8 @@
         state: 'crawling',
         dieT: 0,
         passedGates: new Set(),
-        targeted: false
+        targeted: false,
+        stealth: Math.random() < 0.32     // ~1/3 of bugs are stealth (faint)
       });
     };
 
@@ -352,7 +354,7 @@
         });
       }
       if (mode === 'leak') { prodFlashT = performance.now(); leakCount++; }
-      else { killCount++; }
+      else { killCount++; if (b.stealth) stealthKills++; }
     };
 
     // ---- bug drawers ----
@@ -574,31 +576,52 @@
 
       const prodX = w * PROD_X_FRAC;
 
-      // ---- gates ----
-      ctx.setLineDash([4, 6]);
+      // ---- gates (vivid colored test stations) ----
+      ctx.setLineDash([6, 6]);
       for (const g of gates) {
-        ctx.strokeStyle = `rgba(${INK}, 0.14)`;
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(g.x, 50); ctx.lineTo(g.x, h - 50); ctx.stroke();
-        ctx.fillStyle = `rgba(${INK}, 0.4)`;
-        ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
-        ctx.fillText(g.label, g.x - 10, 38);
+        // line (semi-transparent colored)
+        ctx.strokeStyle = g.color + '88';      // ~53% alpha hex
+        ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(g.x, 110); ctx.lineTo(g.x, h - 30); ctx.stroke();
+        // label pill at top
+        ctx.setLineDash([]);
+        const txt = g.label;
+        ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
+        const tw = ctx.measureText(txt).width;
+        const px = g.x - tw / 2 - 8, py = 76;
+        // pill bg
+        ctx.fillStyle = g.color;
+        ctx.beginPath(); ctx.roundRect(px, py, tw + 16, 18, 9); ctx.fill();
+        // label
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(txt, px + 8, py + 13);
+        // small "GATE" caption below
+        ctx.fillStyle = g.color + 'aa';
+        ctx.font = '600 8px ui-monospace, "JetBrains Mono", monospace';
+        ctx.fillText('TEST GATE', g.x - 23, py + 30);
+        ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
+        ctx.setLineDash([6, 6]);
       }
       ctx.setLineDash([]);
 
-      // ---- PROD line ----
+      // ---- PROD line (bold emerald wall) ----
       const prodFade = Math.max(0, 1 - (now - prodFlashT) / 700);
       const prodCol = prodFade > 0 ? FAIL : ACCENT;
-      ctx.strokeStyle = `rgba(${prodCol}, ${0.4 + prodFade * 0.5})`;
-      ctx.lineWidth = 1.8 + prodFade * 2;
-      ctx.beginPath(); ctx.moveTo(prodX, 20); ctx.lineTo(prodX, h - 20); ctx.stroke();
-      ctx.save();
-      ctx.translate(prodX + 12, 60);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillStyle = `rgba(${prodCol}, ${0.7 + prodFade * 0.3})`;
-      ctx.font = '700 10px ui-monospace, "JetBrains Mono", monospace';
-      ctx.fillText('▶ PROD', 0, 0);
-      ctx.restore();
+      // soft outer glow
+      ctx.strokeStyle = `rgba(${prodCol}, ${0.18 + prodFade * 0.4})`;
+      ctx.lineWidth = 8 + prodFade * 4;
+      ctx.beginPath(); ctx.moveTo(prodX, 110); ctx.lineTo(prodX, h - 20); ctx.stroke();
+      // core line
+      ctx.strokeStyle = `rgba(${prodCol}, ${0.85 + prodFade * 0.15})`;
+      ctx.lineWidth = 2.4 + prodFade * 1.6;
+      ctx.beginPath(); ctx.moveTo(prodX, 110); ctx.lineTo(prodX, h - 20); ctx.stroke();
+      // top PROD label as pill
+      ctx.font = '800 11px ui-monospace, "JetBrains Mono", monospace';
+      const ptw = ctx.measureText('▶ PROD').width;
+      ctx.fillStyle = `rgba(${prodCol}, 1)`;
+      ctx.beginPath(); ctx.roundRect(prodX - ptw / 2 - 9, 76, ptw + 18, 20, 10); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('▶ PROD', prodX - ptw / 2, 90);
 
       // ---- sentinels: aim at closest crawling bug, fire if cooldown elapsed ----
       for (const s of sentinels) {
@@ -688,8 +711,22 @@
             killBug(b, 'leak');
           }
 
-          // render
-          DRAWERS[b.species](b, now);
+          // render — stealth bugs are faint, with a subtle dashed outline
+          if (b.stealth) {
+            ctx.globalAlpha = 0.38;
+            DRAWERS[b.species](b, now);
+            ctx.globalAlpha = 1;
+            // hint outline (very subtle, dashed)
+            ctx.setLineDash([2, 3]);
+            ctx.strokeStyle = `rgba(${INK}, 0.18)`;
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.size * 1.9, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          } else {
+            DRAWERS[b.species](b, now);
+          }
         } else if (b.state === 'dying') {
           const age = now - b.dieT;
           if (age > 600) { bugs.splice(i, 1); continue; }
@@ -780,12 +817,21 @@
         ctx.setLineDash([]);
       }
 
-      // ---- HUD ----
-      ctx.fillStyle = `rgba(${INK}, 0.40)`;
-      ctx.font = '600 10px ui-monospace, "JetBrains Mono", monospace';
-      ctx.fillText(`bugs squashed: ${killCount}`, 20, h - 30);
-      ctx.fillStyle = `rgba(${FAIL}, ${leakCount > 0 ? 0.65 : 0.35})`;
-      ctx.fillText(`leaked to prod: ${leakCount}`, 20, h - 16);
+      // ---- HUD (bottom-right pill stack, away from CTAs) ----
+      const hudW = 200, hudH = 72;
+      // place vertically between sentinel 2 and 3, just left of PROD line
+      const hudX = prodX - hudW - 18, hudY = h * 0.66;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.82)';
+      ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 10); ctx.fill();
+      ctx.strokeStyle = `rgba(${INK}, 0.10)`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 10); ctx.stroke();
+      ctx.font = '700 10px ui-monospace, "JetBrains Mono", monospace';
+      ctx.fillStyle = `rgba(${ACCENT}, 0.95)`;
+      ctx.fillText(`● bugs squashed: ${killCount}`, hudX + 12, hudY + 18);
+      ctx.fillStyle = `rgba(168, 85, 247, 0.95)`;
+      ctx.fillText(`◆ stealth caught: ${stealthKills}`, hudX + 12, hudY + 38);
+      ctx.fillStyle = `rgba(${FAIL}, ${leakCount > 0 ? 0.95 : 0.65})`;
+      ctx.fillText(`✖ leaked to prod: ${leakCount}`, hudX + 12, hudY + 58);
 
       requestAnimationFrame(tick);
     };
