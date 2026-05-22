@@ -61,34 +61,157 @@
     });
   });
 
-  // ===== custom cursor + magnetic buttons =====
-  const cd = $('#cursor-dot'), cr = $('#cursor-ring');
-  if (cd && cr && window.matchMedia('(hover:hover) and (pointer:fine)').matches) {
-    let mx = innerWidth / 2, my = innerHeight / 2;
-    let rx = mx, ry = my;
-    window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cd.style.transform = `translate(${mx}px, ${my}px) translate(-50%,-50%)`; });
+  // ===== custom cursor + magnetic buttons (flagship) =====
+  (() => {
+    const cd = $('#cursor-dot'), cr = $('#cursor-ring');
+    if (!cd || !cr) return;
+    if (!window.matchMedia('(hover:hover) and (pointer:fine)').matches) return;
+
+    // pointer + smoothed positions
+    let mx = innerWidth / 2, my = innerHeight / 2; // raw
+    let rx = mx, ry = my;                           // ring (lerped)
+    let dx = mx, dy = my;                           // dot  (lerped, faster)
+
+    // trail particles
+    const trail = [];
+    const TRAIL_N = 5;
+    for (let i = 0; i < TRAIL_N; i++) {
+      const t = document.createElement('div');
+      t.className = 'cursor-trail';
+      t.style.opacity = String(0.28 - i * 0.05);
+      document.body.appendChild(t);
+      trail.push({ el: t, x: mx, y: my });
+    }
+
+    // state
+    let stuckEl = null;          // element we're sticking to
+    let stuckRect = null;
+    let labelText = '';
+    let invert = false;
+
+    const HOVER_SEL = 'a, button, input, textarea, select, [data-magnetic], [data-cursor]';
+
+    const setLabel = (txt) => {
+      labelText = txt || '';
+      cr.textContent = labelText;
+      cr.classList.toggle('label', !!labelText);
+    };
+
+    // pointermove
+    window.addEventListener('pointermove', e => {
+      mx = e.clientX; my = e.clientY;
+
+      const t = e.target;
+      // inputs → hide cursor so native I-beam shows
+      const isText = t.matches && t.matches('input:not([type="range"]):not([type="checkbox"]):not([type="number"]), textarea, [contenteditable="true"]');
+      cd.classList.toggle('hide', !!isText);
+      cr.classList.toggle('hide', !!isText);
+
+      // find nearest cursor-relevant element
+      const target = t.closest ? t.closest(HOVER_SEL) : null;
+
+      // invert mode (over dark sections)
+      const dark = t.closest ? t.closest('[data-cursor-invert]') : null;
+      const newInvert = !!dark;
+      if (newInvert !== invert) {
+        invert = newInvert;
+        cr.classList.toggle('invert', invert);
+        cd.classList.toggle('invert', invert);
+      }
+
+      if (target) {
+        cr.classList.add('hover');
+        // pick up data-cursor label (from target or any ancestor with data-cursor)
+        const labelHost = t.closest('[data-cursor]');
+        const lbl = labelHost ? labelHost.getAttribute('data-cursor') : '';
+
+        // bug arena → "grab" style
+        const isGrab = target.id === 'bug-arena' || (target.closest && target.closest('#bug-arena'));
+        cr.classList.toggle('grab', !!isGrab);
+
+        setLabel(lbl);
+
+        // sticky for solid buttons/links with bounded size
+        const stickable = target.matches('a, button, [data-magnetic]') && !target.matches('#bug-arena, .bento, .bento *');
+        if (stickable) {
+          stuckEl = target;
+          stuckRect = target.getBoundingClientRect();
+        } else {
+          stuckEl = null; stuckRect = null;
+        }
+      } else {
+        cr.classList.remove('hover', 'grab');
+        setLabel('');
+        stuckEl = null; stuckRect = null;
+      }
+    }, { passive: true });
+
+    window.addEventListener('pointerleave', () => {
+      cd.classList.add('hide'); cr.classList.add('hide');
+    });
+    window.addEventListener('pointerenter', () => {
+      cd.classList.remove('hide'); cr.classList.remove('hide');
+    });
+
+    // click ripple
+    window.addEventListener('pointerdown', e => {
+      const r = document.createElement('div');
+      r.className = 'cursor-ripple';
+      if (invert) r.style.borderColor = 'var(--bg)';
+      r.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
+      document.body.appendChild(r);
+      setTimeout(() => r.remove(), 560);
+      // squeeze the ring
+      cr.style.transform += ' scale(.85)';
+      setTimeout(() => { /* reset handled by loop */ }, 120);
+    });
+
+    // RAF loop
     const loop = () => {
-      rx += (mx - rx) * 0.18;
-      ry += (my - ry) * 0.18;
-      cr.style.transform = `translate(${rx}px, ${ry}px) translate(-50%,-50%)`;
+      // dot — fast follow
+      dx += (mx - dx) * 0.45;
+      dy += (my - dy) * 0.45;
+      cd.style.transform = `translate(${dx}px, ${dy}px) translate(-50%, -50%)`;
+
+      // ring — slower; if stuck to an element, blend toward its center + slight magnetism toward pointer
+      let tx = mx, ty = my;
+      if (stuckEl && stuckRect && document.contains(stuckEl)) {
+        // refresh rect (cheap-ish, only when stuck)
+        stuckRect = stuckEl.getBoundingClientRect();
+        const cx = stuckRect.left + stuckRect.width / 2;
+        const cy = stuckRect.top + stuckRect.height / 2;
+        // ring sticks to center, plus ~30% pull toward the cursor — feels alive
+        tx = cx + (mx - cx) * 0.30;
+        ty = cy + (my - cy) * 0.30;
+      }
+      rx += (tx - rx) * 0.22;
+      ry += (ty - ry) * 0.22;
+      cr.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -50%)`;
+
+      // trail — each particle lerps toward the previous one (chain)
+      let px = dx, py = dy;
+      for (let i = 0; i < trail.length; i++) {
+        const p = trail[i];
+        p.x += (px - p.x) * (0.32 - i * 0.04);
+        p.y += (py - p.y) * (0.32 - i * 0.04);
+        p.el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`;
+        px = p.x; py = p.y;
+      }
       requestAnimationFrame(loop);
     };
     loop();
-    const hoverables = 'a, button, input, textarea, select, [data-magnetic]';
-    document.addEventListener('mouseover', e => { if (e.target.closest(hoverables)) cr.classList.add('hover'); });
-    document.addEventListener('mouseout', e => { if (e.target.closest(hoverables)) cr.classList.remove('hover'); });
 
-    // magnetic
+    // magnetic pull on elements
     $$('[data-magnetic]').forEach(el => {
       el.addEventListener('mousemove', e => {
         const r = el.getBoundingClientRect();
-        const dx = e.clientX - (r.left + r.width / 2);
-        const dy = e.clientY - (r.top + r.height / 2);
-        el.style.transform = `translate(${dx * 0.18}px, ${dy * 0.22}px)`;
+        const dxm = e.clientX - (r.left + r.width / 2);
+        const dym = e.clientY - (r.top + r.height / 2);
+        el.style.transform = `translate(${dxm * 0.20}px, ${dym * 0.24}px)`;
       });
       el.addEventListener('mouseleave', () => { el.style.transform = ''; });
     });
-  }
+  })();
 
   // ===== particle constellation canvas =====
   (() => {

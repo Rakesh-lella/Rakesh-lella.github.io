@@ -237,27 +237,107 @@ body::after {
   100% { transform: translateX(360%); }
 }
 
-/* ---------- CUSTOM CURSOR ---------- */
-.cursor-dot, .cursor-ring {
-  position: fixed; top: 0; left: 0; z-index: 999;
+/* ---------- CUSTOM CURSOR · flagship ---------- */
+.cursor-dot, .cursor-ring, .cursor-trail, .cursor-ripple {
+  position: fixed; top: 0; left: 0;
   pointer-events: none;
   border-radius: 999px;
   will-change: transform;
 }
-.cursor-dot { width: 6px; height: 6px; background: var(--ink); transition: transform .12s var(--e-out), opacity .2s; }
+.cursor-dot {
+  width: 6px; height: 6px;
+  background: var(--ink);
+  z-index: 9999;
+  transition: opacity .25s, background .3s, transform .12s var(--e-out);
+}
 .cursor-ring {
   width: 38px; height: 38px;
-  border: 1px solid var(--ink);
-  transition: width .25s var(--e-out), height .25s var(--e-out), background .25s, border-color .2s;
+  border: 1.5px solid var(--ink);
+  z-index: 9998;
+  background: transparent;
+  transition:
+    width  .35s var(--e-out),
+    height .35s var(--e-out),
+    border-radius .35s var(--e-out),
+    background .25s var(--e-out),
+    border-color .25s,
+    opacity .25s,
+    padding .25s var(--e-out),
+    color .25s;
+  display: grid; place-items: center;
+  color: transparent;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: lowercase;
+  white-space: nowrap;
+  overflow: hidden;
   mix-blend-mode: difference;
+  filter: invert(0);
 }
+/* hover state (any clickable) */
 .cursor-ring.hover {
-  width: 64px; height: 64px;
+  width: 56px; height: 56px;
   background: var(--ink);
   border-color: var(--ink);
 }
+/* label state (data-cursor) */
+.cursor-ring.label {
+  width: auto; height: auto;
+  min-width: 84px; min-height: 38px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  mix-blend-mode: normal;
+  box-shadow: 0 8px 24px rgba(24,169,87,.32);
+}
+/* drag/grab state (the bug arena) */
+.cursor-ring.grab {
+  cursor: grabbing;
+  background: var(--coral);
+  border-color: var(--coral);
+  color: #fff;
+  mix-blend-mode: normal;
+}
+/* inverse (dark sections) */
+.cursor-ring.invert { border-color: var(--bg); }
+.cursor-ring.invert.hover { background: var(--bg); border-color: var(--bg); }
+.cursor-dot.invert { background: var(--bg); }
+/* hidden over text inputs */
+.cursor-dot.hide, .cursor-ring.hide { opacity: 0; }
+
+/* echo trail */
+.cursor-trail {
+  width: 6px; height: 6px;
+  background: var(--accent);
+  z-index: 9997;
+  opacity: .35;
+  transition: opacity .4s;
+}
+
+/* click ripple */
+.cursor-ripple {
+  width: 38px; height: 38px;
+  border: 1.5px solid var(--ink);
+  z-index: 9996;
+  animation: ring-ripple .55s var(--e-out) forwards;
+  transform: translate(-50%, -50%);
+}
+@keyframes ring-ripple {
+  0%   { width: 0; height: 0; opacity: .85; }
+  100% { width: 160px; height: 160px; opacity: 0; }
+}
+
 @media (hover: none), (pointer: coarse) {
-  .cursor-dot, .cursor-ring { display: none; }
+  .cursor-dot, .cursor-ring, .cursor-trail, .cursor-ripple { display: none; }
+  body { cursor: auto; }
+}
+@media (hover: hover) and (pointer: fine) {
+  body, a, button { cursor: none; }
+  input, textarea, select { cursor: text; }
 }
 
 /* ---------- SCROLL PROGRESS ---------- */
