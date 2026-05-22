@@ -271,7 +271,7 @@
         // p = kill probability for *non-stealth* bugs;
         // stealthP = override for stealth bugs (lower = more survive)
         // owner: 'dev' (unit tests, written by devs) | 'qa' (QA-owned envs)
-        { x: W * 0.38, label: 'UNIT',   caption: 'DEV UNIT TESTS', owner: 'dev', p: 0.20, stealthP: 0.15, color: '#0ea5e9' },
+        { x: W * 0.38, label: 'UNIT',   caption: 'DEV UNIT TESTS', owner: 'dev', p: 0.12, stealthP: 0.08, color: '#0ea5e9' },
         { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 1.00, stealthP: 0.55, color: '#f97316' },
         { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 1.00, stealthP: 1.00, color: '#a855f7' }
       ];
@@ -791,7 +791,7 @@
 
           // dev pre-UNIT zone: small per-frame chance the nearest dev swats this bug
           // (~5% overall kill rate before the UNIT line)
-          if (b.x < unitX && Math.random() < 0.0009) {
+          if (b.x < unitX && Math.random() < 0.00035) {
             // flash nearest dev's screen + tiny blue spark trail from dev to bug
             let bestDev = null, bestDD = 1e9;
             for (const d of devs) {
@@ -822,6 +822,22 @@
             if (dx*dx + dy*dy < SQUASH_R * SQUASH_R) killBug(b, 'squash', null, 'qa');
           }
 
+          // QA zone scheduled kill (a bug condemned at a QA gate dies at a random spot inside the zone)
+          if (b.state === 'crawling' && b.qaKillAtX != null && b.x >= b.qaKillAtX) {
+            const g = b.qaKillGate;
+            for (let k = 0; k < 9; k++) {
+              confetti.push({
+                x: b.x, y: b.y,
+                vx: (Math.random() - 0.5) * 3,
+                vy: (Math.random() - 0.5) * 3,
+                t0: now, life: 420,
+                color: g.color, size: 1.7
+              });
+            }
+            killBug(b, 'zap', g.color, g.owner);
+            b.qaKillAtX = null;
+          }
+
           // gates: stage-specific kill probabilities; attribute to owner
           for (const g of gates) {
             if (b.state !== 'crawling') break;
@@ -829,17 +845,28 @@
               b.passedGates.add(g.label);
               const killChance = b.stealth ? g.stealthP : g.p;
               if (Math.random() < killChance) {
-                // electric arc spark on gate line
-                for (let k = 0; k < 7; k++) {
-                  confetti.push({
-                    x: g.x, y: b.y,
-                    vx: (Math.random() - 0.5) * 3,
-                    vy: (Math.random() - 0.5) * 3,
-                    t0: now, life: 380,
-                    color: g.color, size: 1.7
-                  });
+                if (g.owner === 'dev') {
+                  // dev unit-test kill: happens right at the line (the test runs there)
+                  for (let k = 0; k < 7; k++) {
+                    confetti.push({
+                      x: g.x, y: b.y,
+                      vx: (Math.random() - 0.5) * 3,
+                      vy: (Math.random() - 0.5) * 3,
+                      t0: now, life: 380,
+                      color: g.color, size: 1.7
+                    });
+                  }
+                  killBug(b, 'zap', g.color, g.owner);
+                } else {
+                  // QA gate: condemn the bug, but let it die at a RANDOM spot inside the QA zone
+                  // zone runs from this gate to the next gate (or PROD line for the last gate)
+                  let zoneEnd = prodX;
+                  for (const g2 of gates) { if (g2.x > g.x && g2.x < zoneEnd) zoneEnd = g2.x; }
+                  const zoneStart = g.x + 14;
+                  const zoneSpan = Math.max(40, zoneEnd - zoneStart - 14);
+                  b.qaKillAtX = zoneStart + Math.random() * zoneSpan;
+                  b.qaKillGate = g;
                 }
-                killBug(b, 'zap', g.color, g.owner);
               }
             }
           }
