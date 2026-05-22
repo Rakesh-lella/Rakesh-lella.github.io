@@ -2834,23 +2834,43 @@
     ctx.fillStyle = active ? s.color : 'rgba(10,10,12,0.04)';
     ctx.fillRect(x, y + HDR_H - 8, CARD_W, 8);
 
+    // responsive header text: narrow cards drop the right-side caption and shrink fonts
+    const narrow      = CARD_W < 110;
+    const veryNarrow  = CARD_W < 88;
+    const iconSize    = veryNarrow ? 10 : (narrow ? 12 : 13);
+    const labelSize   = veryNarrow ? 9  : (narrow ? 10 : 11);
+    const captionSize = narrow ? 0 : 9;     // hide caption on narrow cards
+    const iconX       = x + (veryNarrow ? 6 : 8);
+    const labelX      = iconX + (veryNarrow ? 14 : (narrow ? 16 : 18));
+
     // icon
     ctx.fillStyle = active ? '#ffffff' : s.color;
-    ctx.font = '700 13px ui-monospace, "JetBrains Mono", monospace';
+    ctx.font = `700 ${iconSize}px ui-monospace, "JetBrains Mono", monospace`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(s.icon, x + 8, y + HDR_H / 2);
+    ctx.fillText(s.icon, iconX, y + HDR_H / 2);
 
-    // label
+    // label — auto-shrink if it still doesn't fit
     ctx.fillStyle = active ? '#ffffff' : 'rgba(10,10,12,0.82)';
-    ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
-    ctx.fillText(s.label.toUpperCase(), x + 26, y + HDR_H / 2);
+    let lblFont = labelSize;
+    ctx.font = `700 ${lblFont}px ui-monospace, "JetBrains Mono", monospace`;
+    const labelStr   = s.label.toUpperCase();
+    const labelRight = captionSize > 0
+      ? (x + CARD_W - 8 - ctx.measureText(s.caption).width - 6)
+      : (x + CARD_W - 6);
+    while (ctx.measureText(labelStr).width > (labelRight - labelX) && lblFont > 6) {
+      lblFont -= 0.5;
+      ctx.font = `700 ${lblFont}px ui-monospace, "JetBrains Mono", monospace`;
+    }
+    ctx.fillText(labelStr, labelX, y + HDR_H / 2);
 
-    // caption (top right)
-    ctx.fillStyle = active ? 'rgba(255,255,255,0.9)' : 'rgba(10,10,12,0.5)';
-    ctx.font = '500 9px ui-monospace, "JetBrains Mono", monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(s.caption, x + CARD_W - 8, y + HDR_H / 2);
+    // caption (top right) — skipped on narrow cards
+    if (captionSize > 0) {
+      ctx.fillStyle = active ? 'rgba(255,255,255,0.9)' : 'rgba(10,10,12,0.5)';
+      ctx.font = `500 ${captionSize}px ui-monospace, "JetBrains Mono", monospace`;
+      ctx.textAlign = 'right';
+      ctx.fillText(s.caption, x + CARD_W - 8, y + HDR_H / 2);
+    }
 
     // body
     const renderer = BODY_RENDERERS[s.key];
@@ -4245,9 +4265,22 @@
   window.__drawTabs = (ctx, tabs, activeIdx, layout, opts) => {
     const { x, y, w, h } = layout;
     const o = opts || {};
-    const fontSize = o.fontSize || 11;
+    const baseFont = o.fontSize || 11;
     const gap = o.gap != null ? o.gap : 4;
     const tabW = (w - gap * (tabs.length - 1)) / tabs.length;
+
+    // auto-fit: shrink the font until the widest label fits inside tabW - padding
+    const pad = 6;
+    let fontSize = baseFont;
+    ctx.font = `700 ${fontSize}px ui-monospace, "JetBrains Mono", monospace`;
+    let maxLabelW = 0;
+    for (const t of tabs) maxLabelW = Math.max(maxLabelW, ctx.measureText(t.label).width);
+    while (maxLabelW > tabW - pad && fontSize > 6) {
+      fontSize -= 0.5;
+      ctx.font = `700 ${fontSize}px ui-monospace, "JetBrains Mono", monospace`;
+      maxLabelW = 0;
+      for (const t of tabs) maxLabelW = Math.max(maxLabelW, ctx.measureText(t.label).width);
+    }
     ctx.font = `700 ${fontSize}px ui-monospace, "JetBrains Mono", monospace`;
     for (let i = 0; i < tabs.length; i++) {
       const tx = x + i * (tabW + gap);
