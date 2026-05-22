@@ -276,11 +276,11 @@
         // p = kill probability for *non-stealth* bugs;
         // stealthP = override for stealth bugs (lower = more survive)
         // owner: 'dev' (unit tests, written by devs) | 'qa' (QA-owned envs)
-        { x: W * 0.38, label: 'UNIT',   caption: 'DEV UNIT TESTS', owner: 'dev', p: 0.12, stealthP: 0.08, color: '#0ea5e9' },
-        // QA ENV: ~half of non-stealth bugs survive past the line so the user can also squash them
-        { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 0.55, stealthP: 0.20, color: '#f97316' },
-        // STAGE: catches most of what is left, but ~half the invisible bugs slip past for sentinels
-        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 0.85, stealthP: 0.45, color: '#a855f7' }
+        { x: W * 0.38, label: 'UNIT',   caption: 'DEV UNIT TESTS', owner: 'dev', p: 0.12, stealthP: 0.05, color: '#0ea5e9' },
+        // QA ENV: catches plenty of regular bugs, but the hard-to-find ones slip past here
+        { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 0.55, stealthP: 0.06, color: '#f97316' },
+        // STAGE: where hard-to-find bugs get caught (stage-only reproductions) — kills almost all of them
+        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 0.85, stealthP: 0.92, color: '#a855f7' }
       ];
       // devs at left edge (3 workstations) — each with a visible name tag
       const devY = [H * 0.22, H * 0.46, H * 0.70];
@@ -289,7 +289,7 @@
         { shirt: '#10b981', hair: '#7c2d12', skin: '#fde2b8' },
         { shirt: '#ef4444', hair: '#0a0a0c', skin: '#f7d1a8' }
       ];
-      const devNames = ['Aarav', 'Priya', 'Jin'];
+      const devNames = ['DEV', 'DEV', 'DEV'];
       devs = [];
       for (let i = 0; i < 3; i++) {
         devs.push({
@@ -921,7 +921,7 @@
             killBug(b, 'leak');
           }
 
-          // render — stealth bugs are visibly ghostly + labeled INVISIBLE
+          // render — hard-to-find bugs are visibly distinct + labeled HARD-TO-FIND
           if (b.stealth) {
             // soft pulsing halo to telegraph "ghost" state
             const pulse = 0.55 + 0.45 * Math.sin(now / 220 + b.phase);
@@ -945,15 +945,15 @@
             ctx.stroke();
             ctx.setLineDash([]);
             ctx.lineDashOffset = 0;
-            // floating "INVISIBLE BUG" tag above
+            // floating "HARD-TO-FIND" tag above
             const tagX = b.x, tagY = b.y - b.size * 1.9 - 12;
             ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
-            const tw = ctx.measureText('👻 INVISIBLE').width + 10;
+            const tw = ctx.measureText('◆ HARD-TO-FIND').width + 10;
             ctx.fillStyle = 'rgba(168, 85, 247, 0.95)';
             ctx.beginPath(); ctx.roundRect(tagX - tw / 2, tagY - 8, tw, 12, 3); ctx.fill();
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
-            ctx.fillText('👻 INVISIBLE', tagX, tagY + 1);
+            ctx.fillText('◆ HARD-TO-FIND', tagX, tagY + 1);
             ctx.textAlign = 'start';
             // pointer triangle
             ctx.fillStyle = 'rgba(168, 85, 247, 0.95)';
@@ -1053,29 +1053,47 @@
         ctx.setLineDash([]);
       }
 
-      // ---- HUD (kill attribution) — bottom-left, glass card, kept clear of QA sentinels on the right ----
-      const hudW = 248, hudH = 100;
-      const hudX = 14, hudY = h - hudH - 14;
+      // ---- HUD (kill attribution) — single-line strip across the bottom ----
+      const stripH = 30;
+      const stripPad = 14;
+      const stripY = h - stripH - 10;
+      const stripX = 14;
+      const stripW = w - 28;
       ctx.save();
-      // glass background (semi-transparent dark, subtle border, NO solid fill so QA sentinels stay readable)
-      ctx.fillStyle = 'rgba(10, 12, 18, 0.42)';
-      ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 12); ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+      // glass background
+      ctx.fillStyle = 'rgba(10, 12, 18, 0.55)';
+      ctx.beginPath(); ctx.roundRect(stripX, stripY, stripW, stripH, 8); ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
       ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 12); ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(stripX, stripY, stripW, stripH, 8); ctx.stroke();
+
       ctx.font = '700 12px ui-monospace, "JetBrains Mono", monospace';
-      // dev unit-test kills (cyan)
-      ctx.fillStyle = 'rgba(125, 211, 252, 0.95)';
-      ctx.fillText(`⚙ caught by devs (unit): ${devKills}`, hudX + 14, hudY + 22);
-      // QA kills (emerald)
-      ctx.fillStyle = `rgba(74, 222, 128, 0.95)`;
-      ctx.fillText(`● caught by QA:          ${qaKills}`, hudX + 14, hudY + 43);
-      // stealth (purple)
-      ctx.fillStyle = `rgba(196, 181, 253, 0.95)`;
-      ctx.fillText(`👻 invisible bugs caught: ${stealthKills}`, hudX + 14, hudY + 64);
-      // leaked (coral)
-      ctx.fillStyle = `rgba(252, 165, 165, ${leakCount > 0 ? 0.95 : 0.65})`;
-      ctx.fillText(`✖ leaked to prod:        ${leakCount}`, hudX + 14, hudY + 85);
+      ctx.textBaseline = 'middle';
+      const ty = stripY + stripH / 2;
+
+      // segments: [text, color]
+      const segs = [
+        [`⚙ devs: ${devKills}`,                  'rgba(125, 211, 252, 0.95)'],
+        [`● QA: ${qaKills}`,                     'rgba(74, 222, 128, 0.95)'],
+        [`◆ stage-caught (hard-to-find): ${stealthKills}`, 'rgba(196, 181, 253, 0.95)'],
+        [`✖ leaked: ${leakCount}`,               `rgba(252, 165, 165, ${leakCount > 0 ? 0.95 : 0.7})`]
+      ];
+      // measure
+      const widths = segs.map(s => ctx.measureText(s[0]).width);
+      const sepW = ctx.measureText('  |  ').width;
+      const total = widths.reduce((a,b) => a+b, 0) + sepW * (segs.length - 1);
+      let tx = stripX + (stripW - total) / 2;
+      for (let i = 0; i < segs.length; i++) {
+        ctx.fillStyle = segs[i][1];
+        ctx.textAlign = 'left';
+        ctx.fillText(segs[i][0], tx, ty);
+        tx += widths[i];
+        if (i < segs.length - 1) {
+          ctx.fillStyle = 'rgba(255,255,255,0.28)';
+          ctx.fillText('  |  ', tx, ty);
+          tx += sepW;
+        }
+      }
       ctx.restore();
 
       requestAnimationFrame(tick);
@@ -2399,29 +2417,46 @@
   }
 
   // ---- pipeline layout constants (used inside resize) ----
-  const SAFE_LEFT  = 0.08;
-  const SAFE_RIGHT = 0.92;
-  const MIN_GAP    = 36;        // min visible gap between card edges
+  // SAFE_* are computed dynamically in resize() so cards never overflow the canvas on mobile.
+  let SAFE_LEFT  = 0.08;
+  let SAFE_RIGHT = 0.92;
+  const MIN_GAP    = 28;        // min visible gap between card edges
   let   CARD_W     = 124;
   const CARD_H     = 100;
   // two rows: row 1 (i=0..3) at CARD_Y1, row 2 (i=4..6) at CARD_Y2
-  const CARD_Y1    = 80;
-  const CARD_Y2    = 230;
+  let   CARD_Y1    = 80;
+  let   CARD_Y2    = 230;
   const ROW1_COUNT = 4;
 
   const resize = () => {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     const r = c.getBoundingClientRect();
-    W = Math.max(360, r.width);
+    W = Math.max(320, r.width);
     H = Math.max(340, r.height);   // taller — two rows of cards
     c.width = W * dpr; c.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // sized so both rows have visible gaps (use the row with smallest gap)
-    const usable = W * (SAFE_RIGHT - SAFE_LEFT);
-    const gap1   = usable / Math.max(1, ROW1_COUNT - 1);                // 4 stations -> 3 gaps
-    const gap2   = usable / Math.max(1, (7 - ROW1_COUNT) - 1 || 1);     // 3 stations -> 2 gaps
-    const segGap = Math.min(gap1, gap2);
-    CARD_W = Math.max(72, Math.min(132, segGap - MIN_GAP));
+
+    // mobile-aware sizing: shrink card on narrow widths
+    const isMobile = W < 560;
+    const maxCardW = isMobile ? 96 : 152;
+    const minCardW = isMobile ? 64 : 86;
+
+    // first pass: pick CARD_W from the row with the smallest available per-card slot
+    const STAGES_LEN = 7; // QA, git, GitHub, CI, Tests, Deploy, Production
+    const usable0 = W * 0.86;
+    const gap1    = usable0 / Math.max(1, ROW1_COUNT - 1);
+    const gap2    = usable0 / Math.max(1, (STAGES_LEN - ROW1_COUNT) - 1 || 1);
+    const segGap  = Math.min(gap1, gap2);
+    CARD_W = Math.max(minCardW, Math.min(maxCardW, segGap - MIN_GAP));
+
+    // then recompute SAFE bounds so cards never clip canvas edges
+    const margin = CARD_W / 2 + 8;
+    SAFE_LEFT  = margin / W;
+    SAFE_RIGHT = 1 - margin / W;
+
+    // row y positions: top margin + a clear vertical gap between rows
+    CARD_Y1 = CARD_H / 2 + (isMobile ? 18 : 28);
+    CARD_Y2 = CARD_Y1 + CARD_H + (isMobile ? 36 : 52);
   };
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(c);
   window.addEventListener('resize', resize);
@@ -2439,8 +2474,8 @@
 
   let packet = { i: 0, t: 0, phase: 'travel', dwellStart: 0, restartAt: 0 };
   let lastT = 0;
-  const PACKET_SPEED = 0.48;
-  const DWELL = 900;        // ms per station — longer so detailed body anim plays
+  const PACKET_SPEED = 0.42;
+  const DWELL = 1700;       // ms per station — stay long enough for the mini body anim to finish
   const PAUSE_AFTER_LOOP = 1600;
 
   const SAFE_LEFT_DUP_REMOVED = (() => {
@@ -2767,30 +2802,31 @@
     ctx.shadowOffsetY = 0;
 
     // header strip
+    const HDR_H = 26;
     ctx.fillStyle = active ? s.color : 'rgba(10,10,12,0.04)';
-    roundRectPath(x, y, CARD_W, 22, 10);
+    roundRectPath(x, y, CARD_W, HDR_H, 10);
     ctx.fill();
     // clip header bottom corners flat
     ctx.fillStyle = active ? s.color : 'rgba(10,10,12,0.04)';
-    ctx.fillRect(x, y + 14, CARD_W, 8);
+    ctx.fillRect(x, y + HDR_H - 8, CARD_W, 8);
 
     // icon
     ctx.fillStyle = active ? '#ffffff' : s.color;
-    ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
+    ctx.font = '700 13px ui-monospace, "JetBrains Mono", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(s.icon, x + 8, y + 11);
+    ctx.fillText(s.icon, x + 8, y + HDR_H / 2);
 
     // label
-    ctx.fillStyle = active ? '#ffffff' : 'rgba(10,10,12,0.78)';
-    ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
-    ctx.fillText(s.label.toUpperCase(), x + 24, y + 11);
+    ctx.fillStyle = active ? '#ffffff' : 'rgba(10,10,12,0.82)';
+    ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText(s.label.toUpperCase(), x + 26, y + HDR_H / 2);
 
     // caption (top right)
-    ctx.fillStyle = active ? 'rgba(255,255,255,0.85)' : 'rgba(10,10,12,0.45)';
-    ctx.font = '500 7px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillStyle = active ? 'rgba(255,255,255,0.9)' : 'rgba(10,10,12,0.5)';
+    ctx.font = '500 9px ui-monospace, "JetBrains Mono", monospace';
     ctx.textAlign = 'right';
-    ctx.fillText(s.caption, x + CARD_W - 8, y + 11);
+    ctx.fillText(s.caption, x + CARD_W - 8, y + HDR_H / 2);
 
     // body
     const renderer = BODY_RENDERERS[s.key];

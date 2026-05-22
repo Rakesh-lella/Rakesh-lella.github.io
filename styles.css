@@ -248,6 +248,11 @@ body.loading { overflow: hidden; }
 @media (max-width: 860px) {
   .bento-card.bento-full.has-preview { padding: 22px; }
   .bento-card.bento-full.has-preview .card-canvas { height: 220px; }
+  .bento-card.bento-full.has-preview .card-canvas.card-canvas-tall { height: 340px !important; }
+}
+@media (max-width: 560px) {
+  .bento-card.bento-full.has-preview { padding: 18px; }
+  .bento-card.bento-full.has-preview .card-canvas.card-canvas-tall { height: 300px !important; }
 }
 .bg-noise {
   position: fixed; inset: 0; z-index: 1;
