@@ -262,9 +262,10 @@
 
     const resize = () => {
       dpr = Math.min(2, window.devicePixelRatio || 1);
-      const W = innerWidth, H = innerHeight;
+      const r = c.getBoundingClientRect();
+      const W = Math.max(320, r.width);
+      const H = Math.max(280, r.height);
       c.width = W * dpr; c.height = H * dpr;
-      c.style.width = W + 'px'; c.style.height = H + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       w = W; h = H;
       gates = [
@@ -340,8 +341,13 @@
     };
     setTimeout(spawnLoop, 400);
 
-    window.addEventListener('pointermove', (e) => {
-      mx = e.clientX; my = e.clientY;
+    const localPt = (e) => {
+      const r = c.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top, inside: e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom };
+    };
+    c.addEventListener('pointermove', (e) => {
+      const p = localPt(e);
+      mx = p.x; my = p.y;
       const now = performance.now();
       if (now - mLast.t > 16) {
         trail.push({ x: mx, y: my, t: now });
@@ -349,13 +355,14 @@
         mLast = { x: mx, y: my, t: now };
       }
     }, { passive: true });
-    window.addEventListener('pointerleave', () => { mx = -9999; my = -9999; });
-    window.addEventListener('pointerdown', (e) => {
+    c.addEventListener('pointerleave', () => { mx = -9999; my = -9999; });
+    c.addEventListener('pointerdown', (e) => {
+      const p = localPt(e);
       const qaEnvX = gates.length > 1 ? gates[1].x : 0;
       for (const b of bugs) {
         if (b.state !== 'crawling') continue;
         if (b.x < qaEnvX) continue;    // QA only acts AFTER QA ENV line — guarding prod
-        const dx = b.x - e.clientX, dy = b.y - e.clientY;
+        const dx = b.x - p.x, dy = b.y - p.y;
         if (dx*dx + dy*dy < 110*110) killBug(b, 'squash', null, 'qa');
       }
     });
@@ -1024,6 +1031,7 @@
 
     resize();
     window.addEventListener('resize', resize);
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(c);
     tick();
   })();
 

@@ -37,7 +37,7 @@
 <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
 
 <!-- BACKGROUND -->
-<canvas class="bg-canvas" id="bg-canvas" aria-hidden="true"></canvas>
+<!-- bg-canvas moved into hero-right (contained half-page) -->
 <div class="bg-noise" aria-hidden="true"></div>
 
 <!-- NAV -->
@@ -95,40 +95,16 @@
     </div>
 
     <div class="hero-right">
-      <div class="hero-card profile-card">
-        <div class="avatar-wrap">
-          <svg class="avatar-orbit" viewBox="0 0 220 220" aria-hidden="true">
-            <defs>
-              <linearGradient id="og" x1="0" x2="1" y1="0" y2="1">
-                <stop offset="0%" stop-color="#10ffa0"/>
-                <stop offset="50%" stop-color="#7aa2ff"/>
-                <stop offset="100%" stop-color="#ffb86b"/>
-              </linearGradient>
-            </defs>
-            <circle cx="110" cy="110" r="100" fill="none" stroke="url(#og)" stroke-width="1.5" stroke-dasharray="3 8" opacity=".6"/>
-            <circle cx="110" cy="110" r="92" fill="none" stroke="url(#og)" stroke-width="1.5" opacity=".25"/>
-          </svg>
-          <img src="assets/rakesh.jpeg" alt="Rakesh L" class="avatar" loading="eager" data-cursor="hi 👋" />
-          <span class="avatar-status" title="Available now"></span>
-        </div>
-        <div class="profile-info">
-          <h3>Rakesh L</h3>
-          <p class="profile-role">QA Automation Engineer</p>
-          <ul class="profile-meta">
-            <li><span>📍</span> India</li>
-            <li><span>💼</span> WiseTech Global</li>
-            <li><span>🎓</span> B.Tech, JNTU</li>
-            <li><span>🧠</span> 11× AI / GenAI certs</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="hero-card terminal-card">
-        <div class="term-bar">
+      <div class="hero-arena" data-cursor="squash">
+        <div class="hero-arena-bar">
           <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-          <span class="term-title">rakesh@qa — playwright test --reporter=line</span>
+          <span class="hero-arena-title">live · QA pipeline killing bugs before production</span>
+          <span class="hero-arena-pill"><span class="pulse-dot"></span> LIVE</span>
         </div>
-        <pre class="term-body"><code id="term-code"></code><span class="caret">▌</span></pre>
+        <canvas class="bg-canvas" id="bg-canvas" aria-hidden="true"></canvas>
+        <div class="hero-arena-foot">
+          <span>Click bugs after the QA gate to squash them yourself.</span>
+        </div>
       </div>
     </div>
   </div>
@@ -182,7 +158,6 @@
 
 <!-- WORK -->
 <section id="work" class="section">
-  <canvas class="work-canvas" id="work-canvas" aria-hidden="true"></canvas>
   <div class="container">
     <div class="section-head">
       <p class="eyebrow"><span class="eyebrow-num">01</span> Selected Work</p>
@@ -216,6 +191,15 @@
         <h3>Jenkins CI/CD + Allure</h3>
         <p>Multi-env pipelines feeding Allure dashboards on S3 — real-time quality signals for release go / no-go.</p>
         <div class="chips"><span>Jenkins</span><span>Allure</span><span>AWS S3</span></div>
+      </article>
+
+      <article class="bento-card bento-full has-preview">
+        <div class="preview-text">
+          <h3>QA → Git → CI/CD → Production</h3>
+          <p>What happens between writing a test and a green deploy: code committed, pushed to GitHub, Jenkins runs the suite, artifacts published, and only passing builds reach production.</p>
+          <div class="chips"><span>Playwright</span><span>git push</span><span>Jenkins</span><span>Allure</span><span>Rollout</span></div>
+        </div>
+        <canvas class="card-canvas card-canvas-tall" id="work-canvas" aria-hidden="true"></canvas>
       </article>
 
       <article class="bento-card bento-full has-preview">
