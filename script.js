@@ -2347,8 +2347,8 @@
   const DWELL = 900;        // ms per station — longer so detailed body anim plays
   const PAUSE_AFTER_LOOP = 1600;
 
-  const SAFE_LEFT  = 0.062;
-  const SAFE_RIGHT = 0.938;
+  const SAFE_LEFT  = 0.085;
+  const SAFE_RIGHT = 0.915;
   const CARD_W = 132;
   const CARD_H = 100;
   const CARD_Y = 76;        // vertical center of card row (above the section-head)
@@ -2798,6 +2798,529 @@
     const prog = dwellProg(now);
 
     // draw all stations
+    for (let i = 0; i < STAGES.length; i++) {
+      const active =
+        i < packet.i ||
+        (i === packet.i && (packet.phase === 'dwell' || packet.phase === 'restart')) ||
+        (packet.phase === 'restart' && i === STAGES.length - 1);
+      const glow = (i === packet.i && packet.phase === 'dwell')
+        ? Math.max(0, 1 - (now - packet.dwellStart) / DWELL)
+        : 0;
+      const stationProg = (i === packet.i && packet.phase === 'dwell') ? prog : (active ? 1 : 0);
+      drawStation(i, active, glow, stationProg);
+    }
+
+    drawPacket();
+
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})();
+
+/* =========================================================
+   STACK SECTION BACKGROUND — API testing storyboard
+   Write test → POST request → Headers/Auth → Server → DB → Response → Assertions
+   ========================================================= */
+(() => {
+  const c = document.getElementById('stack-canvas');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  let dpr = 1, W = 0, H = 0;
+
+  const resize = () => {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    const r = c.getBoundingClientRect();
+    W = Math.max(360, r.width);
+    H = Math.max(280, r.height);
+    c.width = W * dpr; c.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(c);
+  window.addEventListener('resize', resize);
+  resize();
+
+  const STAGES = [
+    { key: 'write',   label: 'Write',    caption: 'spec.ts',     color: '#0ea5e9', icon: '✎' },
+    { key: 'request', label: 'POST',     caption: '/login',      color: '#6d3df1', icon: '↗' },
+    { key: 'headers', label: 'Headers',  caption: 'Auth',        color: '#475569', icon: '≡' },
+    { key: 'server',  label: 'Server',   caption: 'handle',      color: '#f5a623', icon: '⊕' },
+    { key: 'db',      label: 'DB',       caption: 'query',       color: '#0891b2', icon: '▤' },
+    { key: 'resp',    label: 'Response', caption: '200 OK',      color: '#18a957', icon: '{}' },
+    { key: 'assert',  label: 'Verify',   caption: '4/4 ✓',       color: '#0a6f3a', icon: '✓' }
+  ];
+
+  let packet = { i: 0, t: 0, phase: 'travel', dwellStart: 0, restartAt: 0 };
+  let lastT = 0;
+  const PACKET_SPEED = 0.48;
+  const DWELL = 1000;
+  const PAUSE_AFTER_LOOP = 1600;
+
+  const SAFE_LEFT  = 0.085;
+  const SAFE_RIGHT = 0.915;
+  const CARD_W = 132;
+  const CARD_H = 100;
+  const CARD_Y = 76;
+
+  const stationFor = (i) => {
+    const f = SAFE_LEFT + (SAFE_RIGHT - SAFE_LEFT) * (i / (STAGES.length - 1));
+    return { x: W * f, y: CARD_Y, ...STAGES[i] };
+  };
+
+  const roundRectPath = (x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+
+  const dwellProg = (now) => {
+    if (packet.phase !== 'dwell') return 0;
+    return Math.min(1, (now - packet.dwellStart) / DWELL);
+  };
+
+  const bodyRect = (cx, cy) => ({
+    x: cx - CARD_W / 2 + 10,
+    y: cy - CARD_H / 2 + 24,
+    w: CARD_W - 20,
+    h: CARD_H - 42
+  });
+
+  // 1. WRITE — API test code being typed
+  const drawBodyWrite = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    const lineH = 7;
+    const lines = [
+      { w: 0.62, c: '#6d3df1' },  // test('login...
+      { w: 0.74, c: '#1d1d22' },  //   const r = await
+      { w: 0.50, c: '#0ea5e9' },  //   request.post()
+      { w: 0.66, c: '#18a957' },  //   expect(r.status)
+      { w: 0.40, c: '#18a957' }   //   .toBe(200)
+    ];
+    const showCount = active ? Math.ceil(lines.length * (0.4 + 0.6 * prog)) : lines.length;
+    for (let i = 0; i < lines.length; i++) {
+      const yy = b.y + i * (lineH + 2);
+      const visible = i < showCount;
+      ctx.fillStyle = visible
+        ? (active ? lines[i].c : 'rgba(10,10,12,0.30)')
+        : 'rgba(10,10,12,0.08)';
+      roundRectPath(b.x, yy, b.w * lines[i].w, lineH - 2, 2);
+      ctx.fill();
+    }
+    if (active && showCount > 0 && showCount <= lines.length) {
+      const li = Math.min(showCount - 1, lines.length - 1);
+      const yy = b.y + li * (lineH + 2);
+      const cursorX = b.x + b.w * lines[li].w + 2;
+      if ((performance.now() % 700) < 380) {
+        ctx.fillStyle = lines[li].c;
+        ctx.fillRect(cursorX, yy, 2, lineH - 2);
+      }
+    }
+  };
+
+  // 2. POST — REST client UI: METHOD pill + URL + Send button
+  const drawBodyRequest = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    // METHOD pill
+    const mw = 26;
+    ctx.fillStyle = active ? '#6d3df1' : 'rgba(109,61,241,0.30)';
+    roundRectPath(b.x, b.y, mw, 12, 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('POST', b.x + mw / 2, b.y + 6);
+    // URL bar
+    ctx.fillStyle = 'rgba(10,10,12,0.06)';
+    roundRectPath(b.x + mw + 2, b.y, b.w - mw - 2, 12, 2);
+    ctx.fill();
+    ctx.fillStyle = active ? 'rgba(10,10,12,0.80)' : 'rgba(10,10,12,0.40)';
+    ctx.font = '600 7px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const url = '/api/login';
+    const shown = active ? Math.floor(url.length * Math.min(1, prog * 1.6)) : url.length;
+    ctx.fillText(url.slice(0, shown), b.x + mw + 5, b.y + 6);
+    // body preview lines
+    const lineY = b.y + 18;
+    ctx.fillStyle = 'rgba(10,10,12,0.10)';
+    roundRectPath(b.x, lineY, b.w * 0.85, 4, 2);
+    ctx.fill();
+    roundRectPath(b.x, lineY + 7, b.w * 0.6, 4, 2);
+    ctx.fill();
+    // Send button
+    const btnW = 30, btnH = 11;
+    const btnX = b.x + b.w - btnW;
+    const btnY = b.y + b.h - btnH;
+    const pulse = active && prog > 0.6;
+    if (pulse) {
+      ctx.shadowColor = '#6d3df1';
+      ctx.shadowBlur = 10;
+    }
+    ctx.fillStyle = pulse ? '#6d3df1' : 'rgba(109,61,241,0.50)';
+    roundRectPath(btnX, btnY, btnW, btnH, 3);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Send ↗', btnX + btnW / 2, btnY + btnH / 2);
+  };
+
+  // 3. HEADERS — list of header key:value pairs
+  const drawBodyHeaders = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    const items = [
+      { k: 'Authorization', v: 'Bearer •••' },
+      { k: 'Content-Type',  v: 'json' },
+      { k: 'Accept',        v: 'json' }
+    ];
+    const showCount = active ? Math.ceil(items.length * (0.34 + 0.66 * prog)) : items.length;
+    const rowH = 12;
+    for (let i = 0; i < items.length; i++) {
+      const yy = b.y + i * rowH;
+      const visible = i < showCount;
+      // bg row
+      ctx.fillStyle = visible
+        ? (active ? 'rgba(71,85,105,0.10)' : 'rgba(10,10,12,0.05)')
+        : 'rgba(10,10,12,0.03)';
+      roundRectPath(b.x, yy, b.w, rowH - 2, 2);
+      ctx.fill();
+      // key
+      ctx.fillStyle = visible
+        ? (active ? '#475569' : 'rgba(10,10,12,0.45)')
+        : 'rgba(10,10,12,0.15)';
+      ctx.font = '700 6.5px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(items[i].k, b.x + 4, yy + (rowH - 2) / 2);
+      // value
+      ctx.fillStyle = visible
+        ? (active ? 'rgba(10,10,12,0.78)' : 'rgba(10,10,12,0.45)')
+        : 'rgba(10,10,12,0.15)';
+      ctx.textAlign = 'right';
+      ctx.fillText(items[i].v, b.x + b.w - 4, yy + (rowH - 2) / 2);
+    }
+  };
+
+  // 4. SERVER — stack of layers lighting up + spinning gear hint
+  const drawBodyServer = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    // server rack — 3 horizontal bars
+    const bars = ['auth', 'route', 'logic'];
+    const barH = 10, gap = 3;
+    for (let i = 0; i < bars.length; i++) {
+      const yy = b.y + i * (barH + gap);
+      const lit = active && prog > (i * 0.25 + 0.05);
+      ctx.fillStyle = lit ? '#f5a623' : 'rgba(245,166,35,0.18)';
+      roundRectPath(b.x, yy, b.w, barH, 2);
+      ctx.fill();
+      // status dot at left
+      ctx.fillStyle = lit ? '#ffffff' : 'rgba(255,255,255,0.6)';
+      ctx.beginPath();
+      ctx.arc(b.x + 5, yy + barH / 2, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      // label
+      ctx.fillStyle = lit ? '#ffffff' : 'rgba(10,10,12,0.45)';
+      ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(bars[i], b.x + 11, yy + barH / 2);
+      // check on completion
+      if (lit && prog > (i * 0.25 + 0.18)) {
+        ctx.textAlign = 'right';
+        ctx.fillText('✓', b.x + b.w - 4, yy + barH / 2);
+      }
+    }
+    // spinning indicator bottom
+    if (active) {
+      const a = (performance.now() / 220) % (Math.PI * 2);
+      const sx = b.x + b.w - 8;
+      const sy = b.y + b.h - 4;
+      ctx.strokeStyle = '#f5a623';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 3, a, a + Math.PI * 1.4);
+      ctx.stroke();
+    }
+  };
+
+  // 5. DATABASE — cylinder + SQL query typing
+  const drawBodyDB = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    // cylinder top ellipse
+    const cyl = { x: b.x + 2, y: b.y + 2, w: 22, h: 30 };
+    ctx.fillStyle = active ? '#0891b2' : 'rgba(8,145,178,0.30)';
+    // body
+    ctx.fillRect(cyl.x, cyl.y + 3, cyl.w, cyl.h - 6);
+    // top ellipse
+    ctx.beginPath();
+    ctx.ellipse(cyl.x + cyl.w / 2, cyl.y + 3, cyl.w / 2, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // bottom ellipse
+    ctx.beginPath();
+    ctx.ellipse(cyl.x + cyl.w / 2, cyl.y + cyl.h - 3, cyl.w / 2, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // disc shine
+    ctx.fillStyle = 'rgba(255,255,255,0.30)';
+    ctx.beginPath();
+    ctx.ellipse(cyl.x + cyl.w / 2, cyl.y + 3, cyl.w / 2, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // SQL query — typing animation
+    const sql = 'SELECT *\nFROM users\nWHERE id = ?';
+    const sqlLines = sql.split('\n');
+    const total = sql.length;
+    const shown = active ? Math.floor(total * Math.min(1, prog * 1.4)) : total;
+    ctx.fillStyle = active ? '#0891b2' : 'rgba(10,10,12,0.35)';
+    ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    let charsLeft = shown;
+    for (let i = 0; i < sqlLines.length; i++) {
+      const ln = sqlLines[i];
+      const take = Math.min(ln.length, charsLeft);
+      if (take <= 0) break;
+      ctx.fillText(ln.slice(0, take), b.x + 28, b.y + i * 8);
+      charsLeft -= ln.length + 1;
+    }
+    // result row indicator
+    if (active && prog > 0.7) {
+      ctx.fillStyle = '#18a957';
+      ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('→ 1 row', b.x + 28, b.y + b.h);
+    }
+  };
+
+  // 6. RESPONSE — JSON body forming
+  const drawBodyResponse = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    // status badge
+    ctx.fillStyle = active ? '#18a957' : 'rgba(24,169,87,0.30)';
+    roundRectPath(b.x, b.y, 36, 12, 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('200 OK', b.x + 18, b.y + 6);
+    // JSON body
+    const json = ['{', '  "token":', '    "eyJ…",', '  "user": 42', '}'];
+    const colors = ['rgba(10,10,12,0.55)', '#6d3df1', '#0ea5e9', '#6d3df1', 'rgba(10,10,12,0.55)'];
+    const showCount = active ? Math.ceil(json.length * (0.3 + 0.7 * prog)) : json.length;
+    for (let i = 0; i < json.length; i++) {
+      if (i >= showCount) break;
+      ctx.fillStyle = active ? colors[i] : 'rgba(10,10,12,0.30)';
+      ctx.font = '600 7px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(json[i], b.x, b.y + 16 + i * 8);
+    }
+  };
+
+  // 7. ASSERTIONS — checklist ticking
+  const drawBodyAssert = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    const checks = [
+      'status === 200',
+      'body.token',
+      'schema valid',
+      '< 500 ms'
+    ];
+    const passed = active ? Math.floor(checks.length * Math.min(1, prog * 1.05)) : checks.length;
+    const rowH = (b.h - 4) / checks.length;
+    for (let i = 0; i < checks.length; i++) {
+      const yy = b.y + i * rowH;
+      const isPassed = i < passed;
+      // checkbox
+      ctx.fillStyle = isPassed ? '#0a6f3a' : 'rgba(10,10,12,0.10)';
+      roundRectPath(b.x, yy + rowH / 2 - 4, 8, 8, 2);
+      ctx.fill();
+      if (isPassed) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('✓', b.x + 4, yy + rowH / 2);
+      }
+      // label
+      ctx.fillStyle = isPassed
+        ? '#0a6f3a'
+        : (active ? 'rgba(10,10,12,0.45)' : 'rgba(10,10,12,0.30)');
+      ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(checks[i], b.x + 12, yy + rowH / 2);
+    }
+  };
+
+  const BODY_RENDERERS = {
+    write: drawBodyWrite, request: drawBodyRequest, headers: drawBodyHeaders,
+    server: drawBodyServer, db: drawBodyDB, resp: drawBodyResponse, assert: drawBodyAssert
+  };
+
+  const drawStation = (i, active, glow, prog) => {
+    const s = stationFor(i);
+    const x = s.x - CARD_W / 2;
+    const y = s.y - CARD_H / 2;
+    ctx.save();
+
+    if (glow > 0) {
+      ctx.shadowColor = s.color;
+      ctx.shadowBlur = 18 * glow;
+      ctx.strokeStyle = s.color;
+      ctx.globalAlpha = 0.5 * glow;
+      ctx.lineWidth = 2;
+      roundRectPath(x - 2, y - 2, CARD_W + 4, CARD_H + 4, 12);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = active ? s.color : 'rgba(10,10,12,0.10)';
+    ctx.lineWidth = active ? 1.6 : 1;
+    ctx.shadowColor = 'rgba(10,10,12,0.08)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+    roundRectPath(x, y, CARD_W, CARD_H, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    // header strip
+    ctx.fillStyle = active ? s.color : 'rgba(10,10,12,0.04)';
+    roundRectPath(x, y, CARD_W, 22, 10);
+    ctx.fill();
+    ctx.fillRect(x, y + 14, CARD_W, 8);
+
+    // icon
+    ctx.fillStyle = active ? '#ffffff' : s.color;
+    ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(s.icon, x + 8, y + 11);
+
+    // label
+    ctx.fillStyle = active ? '#ffffff' : 'rgba(10,10,12,0.78)';
+    ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText(s.label.toUpperCase(), x + 24, y + 11);
+
+    // caption
+    ctx.fillStyle = active ? 'rgba(255,255,255,0.85)' : 'rgba(10,10,12,0.45)';
+    ctx.font = '500 7px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(s.caption, x + CARD_W - 8, y + 11);
+
+    const renderer = BODY_RENDERERS[s.key];
+    if (renderer) renderer(s.x, s.y, active, prog);
+
+    ctx.fillStyle = active ? s.color : 'rgba(10,10,12,0.08)';
+    roundRectPath(x + 6, y + CARD_H - 4, CARD_W - 12, 2, 1);
+    ctx.fill();
+
+    ctx.restore();
+  };
+
+  const drawPipe = () => {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(10,10,12,0.14)';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([4, 6]);
+    for (let i = 0; i < STAGES.length - 1; i++) {
+      const a = stationFor(i);
+      const b = stationFor(i + 1);
+      const x1 = a.x + CARD_W / 2;
+      const x2 = b.x - CARD_W / 2;
+      if (x2 > x1) {
+        ctx.beginPath();
+        ctx.moveTo(x1, a.y);
+        ctx.lineTo(x2, b.y);
+        ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+  };
+
+  const drawPacket = () => {
+    if (packet.phase !== 'travel') return;
+    if (packet.i >= STAGES.length - 1) return;
+    const a = stationFor(packet.i);
+    const b = stationFor(packet.i + 1);
+    const x1 = a.x + CARD_W / 2;
+    const x2 = b.x - CARD_W / 2;
+    const t = packet.t;
+    const e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+    const px = x1 + (x2 - x1) * e;
+    const py = a.y + (b.y - a.y) * e;
+    ctx.save();
+    ctx.shadowColor = b.color;
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+    for (let k = 1; k <= 4; k++) {
+      const tk = Math.max(0, e - k * 0.05);
+      const tx = x1 + (x2 - x1) * tk;
+      const ty = a.y + (b.y - a.y) * tk;
+      ctx.globalAlpha = (4 - k) / 6;
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.arc(tx, ty, 2.6 - k * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  };
+
+  const tick = (now) => {
+    if (!lastT) lastT = now;
+    const dt = Math.min(80, now - lastT); lastT = now;
+
+    ctx.clearRect(0, 0, W, H);
+    drawPipe();
+
+    if (packet.phase === 'travel') {
+      packet.t += (dt / 1000) * PACKET_SPEED;
+      if (packet.t >= 1) {
+        packet.t = 1;
+        packet.phase = 'dwell';
+        packet.dwellStart = now;
+      }
+    } else if (packet.phase === 'dwell') {
+      if (now - packet.dwellStart > DWELL) {
+        packet.i += 1;
+        if (packet.i >= STAGES.length - 1) {
+          packet.phase = 'restart';
+          packet.restartAt = now + PAUSE_AFTER_LOOP;
+        } else {
+          packet.phase = 'travel';
+          packet.t = 0;
+        }
+      }
+    } else if (packet.phase === 'restart') {
+      if (now > packet.restartAt) {
+        packet.i = 0;
+        packet.t = 0;
+        packet.phase = 'travel';
+      }
+    }
+
+    const prog = dwellProg(now);
+
     for (let i = 0; i < STAGES.length; i++) {
       const active =
         i < packet.i ||
