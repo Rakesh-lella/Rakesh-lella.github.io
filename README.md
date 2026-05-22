@@ -2,7 +2,7 @@
 
 Live site: **https://rakeshlella.github.io**
 
-Personal portfolio of Rakesh L — QA Automation Engineer / SDET.
+Personal portfolio of Rakesh L — QA Automation Engineer.
 
 ## Stack
 - Vanilla HTML / CSS / JavaScript (no build step)

@@ -1,342 +1,450 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Rakesh L — QA Automation Engineer | SDET</title>
-<meta name="description" content="Portfolio of Rakesh L — QA Engineer with 5+ years in automation, Playwright, Cypress, Selenium, API testing, and AI-driven test frameworks." />
+<title>Rakesh L · QA Automation Engineer</title>
+<meta name="description" content="Rakesh L — QA Automation Engineer. Playwright, Cypress, Selenium, API & performance testing, AI-driven test frameworks. Interactive test lab inside." />
+<meta name="theme-color" content="#0b0d10" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2300d68f'/%3E%3Cpath d='M20 32l8 8 16-16' stroke='%230b0d10' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
 </head>
 <body>
 
-<!-- Animated background -->
-<div class="bg-grid"></div>
-<div class="bg-blob blob-1"></div>
-<div class="bg-blob blob-2"></div>
-<div class="bg-blob blob-3"></div>
+<!-- subtle grid background -->
+<div class="grid-bg" aria-hidden="true"></div>
 
-<!-- Navigation -->
+<!-- NAV -->
 <nav class="nav">
   <div class="nav-inner">
-    <a href="#home" class="nav-logo">
-      <span class="logo-bracket">&lt;</span>RL<span class="logo-bracket">/&gt;</span>
+    <a href="#top" class="brand">
+      <span class="brand-mark">✓</span>
+      <span class="brand-text">rakesh<span class="brand-dim">.test</span></span>
     </a>
     <ul class="nav-links">
-      <li><a href="#about">About</a></li>
-      <li><a href="#skills">Skills</a></li>
-      <li><a href="#experience">Experience</a></li>
-      <li><a href="#projects">Projects</a></li>
+      <li><a href="#work">Work</a></li>
+      <li><a href="#stack">Stack</a></li>
+      <li><a href="#lab">Test Lab</a></li>
+      <li><a href="#journey">Journey</a></li>
       <li><a href="#contact">Contact</a></li>
     </ul>
-    <button class="nav-toggle" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+    <div class="nav-actions">
+      <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="i-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <a href="assets/RakeshLella_Resume.pdf" download class="btn btn-primary btn-sm">Resume</a>
+    </div>
+    <button class="nav-toggle" aria-label="Toggle menu"><span></span><span></span></button>
   </div>
 </nav>
 
 <!-- HERO -->
-<header id="home" class="hero">
-  <div class="hero-content">
+<header id="top" class="hero">
+  <div class="container hero-inner">
     <div class="hero-left">
-      <p class="hero-tag">// Quality Engineer · Automation Architect</p>
+      <div class="status-pill">
+        <span class="dot"></span> Available for QA Automation roles
+      </div>
       <h1 class="hero-title">
-        Hi, I'm <span class="grad-text">Rakesh L</span>
+        I break software<br/>
+        <span class="accent">so users don't.</span>
       </h1>
-      <h2 class="hero-subtitle">
-        I build <span class="rotator"><span>Playwright</span><span>Cypress</span><span>Selenium</span><span>API</span><span>AI-driven</span></span> test frameworks.
-      </h2>
-      <p class="hero-desc">
-        QA Engineer with <strong>5 years</strong> of experience designing automation frameworks from scratch, validating REST APIs, load-testing with Locust, and leveraging <strong>Generative AI &amp; MCP agents</strong> to scaffold modern test ecosystems.
+      <p class="hero-sub">
+        I'm <strong>Rakesh L</strong> — a QA Engineer with 5+ years building automation frameworks in
+        <span class="kbd">Playwright</span> <span class="kbd">Cypress</span> <span class="kbd">Selenium</span>,
+        designing API &amp; load tests, and shipping <strong>AI-augmented</strong> test ecosystems with MCP agents.
       </p>
       <div class="hero-cta">
-        <a href="#projects" class="btn btn-primary">View Work</a>
-        <a href="#contact" class="btn btn-ghost">Get in Touch</a>
-        <a href="assets/RakeshLella_Resume.pdf" class="btn btn-ghost" download>Download Resume</a>
+        <a href="#work" class="btn btn-primary">See my work →</a>
+        <a href="#lab" class="btn btn-ghost">Try the Test Lab 🧪</a>
       </div>
       <div class="hero-stats">
-        <div><strong>5+</strong><span>Years QA</span></div>
-        <div><strong>3</strong><span>Frameworks Built</span></div>
-        <div><strong>11</strong><span>AI Certs</span></div>
+        <div><b>5+</b><span>Years in QA</span></div>
+        <div><b>3</b><span>Frameworks built from scratch</span></div>
+        <div><b>11</b><span>AI / GenAI certifications</span></div>
+        <div><b>0</b><span>Flaky tests tolerated</span></div>
       </div>
     </div>
+
     <div class="hero-right">
-      <div class="avatar-wrap">
-        <div class="avatar-ring"></div>
-        <img src="assets/rakesh.jpeg" alt="Rakesh L" class="avatar" />
-        <div class="floating-chip chip-1">Playwright</div>
-        <div class="floating-chip chip-2">Cypress</div>
-        <div class="floating-chip chip-3">MCP</div>
-        <div class="floating-chip chip-4">Locust.py</div>
-        <div class="floating-chip chip-5">Jenkins</div>
+      <!-- Profile card -->
+      <div class="profile-card">
+        <div class="avatar-wrap">
+          <div class="avatar-ring"></div>
+          <img src="assets/rakesh.jpeg" alt="Rakesh L — QA Automation Engineer" class="avatar" loading="eager" />
+          <span class="avatar-status" title="Available"></span>
+        </div>
+        <div class="profile-info">
+          <h3>Rakesh L</h3>
+          <p>QA Automation Engineer</p>
+          <ul class="profile-meta">
+            <li>📍 India</li>
+            <li>💼 WiseTech Global</li>
+            <li>🎓 B.Tech, JNTU</li>
+          </ul>
+        </div>
       </div>
+      <!-- Terminal card -->
+      <div class="terminal" aria-hidden="true">
+        <div class="term-bar">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="term-title">rakesh@qa — playwright test</span>
+        </div>
+        <pre class="term-body"><code id="term-code"></code><span class="caret">▌</span></pre>
+      </div>
+      <!-- floating badges -->
+      <div class="float-badge b1">✓ 0 flaky</div>
+      <div class="float-badge b2">⚡ 12.4s</div>
+      <div class="float-badge b3">🤖 MCP agent ready</div>
     </div>
   </div>
-  <a href="#about" class="scroll-down" aria-label="Scroll down">
-    <span></span>
-  </a>
 </header>
 
-<!-- ABOUT -->
-<section id="about" class="section">
+<!-- MARQUEE -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <span>Playwright</span><span>·</span>
+    <span>Cypress</span><span>·</span>
+    <span>Selenium</span><span>·</span>
+    <span>TypeScript</span><span>·</span>
+    <span>Python</span><span>·</span>
+    <span>Locust</span><span>·</span>
+    <span>Postman</span><span>·</span>
+    <span>Jenkins</span><span>·</span>
+    <span>Allure</span><span>·</span>
+    <span>MCP Agents</span><span>·</span>
+    <span>Claude Code</span><span>·</span>
+    <span>AWS</span><span>·</span>
+    <span>Playwright</span><span>·</span>
+    <span>Cypress</span><span>·</span>
+    <span>Selenium</span><span>·</span>
+    <span>TypeScript</span><span>·</span>
+    <span>Python</span><span>·</span>
+    <span>Locust</span><span>·</span>
+    <span>Postman</span><span>·</span>
+    <span>Jenkins</span><span>·</span>
+    <span>Allure</span><span>·</span>
+    <span>MCP Agents</span><span>·</span>
+  </div>
+</div>
+
+<!-- WORK / FEATURED PROJECTS -->
+<section id="work" class="section">
   <div class="container">
-    <p class="section-eyebrow">01 — About</p>
-    <h2 class="section-title">A bit about <span class="grad-text">me</span></h2>
-    <div class="about-grid">
-      <div class="about-text">
-        <p>
-          I'm a QA Engineer at <strong>WiseTech Global</strong> (via the E2open acquisition, formerly <em>Blujay Solutions</em>), working on a global <strong>Customs Management</strong> platform that processes import/export declarations across multiple countries for clients like <strong>Shell, FedEx,</strong> and <strong>Sunny</strong>.
-        </p>
-        <p>
-          My journey moved through three generations of automation — <strong>Selenium → Cypress → Playwright</strong> — and today I'm focused on AI-augmented testing: using <strong>MCP agents</strong> and <strong>Generative AI</strong> to scaffold frameworks in days, not weeks.
-        </p>
-        <p>
-          I also love designing CI/CD pipelines, hunting bottlenecks with Locust load tests, and mentoring engineers on automation best practices.
-        </p>
+    <div class="section-head">
+      <p class="eyebrow">01 / Selected Work</p>
+      <h2 class="section-title">Frameworks &amp; pipelines I've shipped</h2>
+      <p class="section-lead">Production-grade automation across customs &amp; logistics platforms used by Shell, FedEx, and Sunny.</p>
+    </div>
+
+    <div class="work-grid">
+      <article class="work-card featured">
+        <div class="work-tag">Flagship</div>
+        <h3>AI-Driven Playwright Framework</h3>
+        <p>Cross-browser E2E scaffolded with MCP agents &amp; GenAI. Cut framework setup from weeks to days, covering critical customs workflows across QA / Stage / Demo.</p>
+        <ul class="kv">
+          <li><b>Setup time</b><span>−85%</span></li>
+          <li><b>Coverage</b><span>120+ flows</span></li>
+          <li><b>Browsers</b><span>3 + mobile</span></li>
+        </ul>
+        <div class="chips">
+          <span>Playwright</span><span>TypeScript</span><span>MCP</span><span>Allure</span><span>POM</span>
+        </div>
+      </article>
+
+      <article class="work-card">
+        <h3>REST API Automation Suite</h3>
+        <p>JSON / XML contract tests, auth flows, schema validation &amp; negative paths using Playwright APIRequestContext + Postman.</p>
+        <div class="chips"><span>Playwright API</span><span>Postman</span><span>JSON</span><span>XML</span></div>
+      </article>
+
+      <article class="work-card">
+        <h3>Locust Performance Suite</h3>
+        <p>Load tests simulating concurrent users — surfaced throughput &amp; latency bottlenecks in customs APIs pre-production.</p>
+        <div class="chips"><span>Locust.py</span><span>Python</span><span>REST</span></div>
+      </article>
+
+      <article class="work-card">
+        <h3>Cypress E2E Framework</h3>
+        <p>Built from scratch with POM, custom commands &amp; Bitbucket Pipelines integration for PR-gated regression runs.</p>
+        <div class="chips"><span>Cypress</span><span>Bitbucket</span><span>POM</span></div>
+      </article>
+
+      <article class="work-card">
+        <h3>Jenkins CI/CD + Allure</h3>
+        <p>Scheduled cross-env pipelines feeding Allure dashboards — real-time quality metrics for release go / no-go.</p>
+        <div class="chips"><span>Jenkins</span><span>Allure</span><span>AWS</span></div>
+      </article>
+
+      <article class="work-card">
+        <h3>AI Fluency Track</h3>
+        <p>11 certifications across Prompt Engineering, Claude Code, MCP, Agents &amp; Subagents — applied directly to QA tooling.</p>
+        <div class="chips"><span>Claude</span><span>MCP</span><span>Agents</span></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- STACK -->
+<section id="stack" class="section section-alt">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">02 / Stack</p>
+      <h2 class="section-title">My testing toolkit</h2>
+    </div>
+    <div class="stack-grid">
+      <div class="stack-card">
+        <div class="stack-icon">🎭</div>
+        <h3>Automation</h3>
+        <ul>
+          <li>Playwright (TS / Python)</li>
+          <li>Cypress</li>
+          <li>Selenium WebDriver</li>
+          <li>POM &amp; data-driven design</li>
+        </ul>
       </div>
-      <div class="about-card">
-        <h3>Quick Facts</h3>
-        <ul class="fact-list">
-          <li><span>📍</span> Based in India</li>
-          <li><span>🎓</span> B.Tech, JNTU (2014–2018)</li>
-          <li><span>💼</span> 5 yrs @ WiseTech Global</li>
-          <li><span>🌐</span> Domain: Customs / Logistics</li>
-          <li><span>🤖</span> AI-first test architect</li>
-          <li><span>🧪</span> Methodologies: Agile, BDD, POM</li>
+      <div class="stack-card">
+        <div class="stack-icon">🔌</div>
+        <h3>API &amp; Performance</h3>
+        <ul>
+          <li>Playwright APIRequestContext</li>
+          <li>Postman / Newman</li>
+          <li>Locust.py load testing</li>
+          <li>Contract &amp; schema validation</li>
+        </ul>
+      </div>
+      <div class="stack-card">
+        <div class="stack-icon">⚙️</div>
+        <h3>CI / CD</h3>
+        <ul>
+          <li>Jenkins pipelines</li>
+          <li>Bitbucket Pipelines</li>
+          <li>Git / GitHub Actions</li>
+          <li>AWS EC2 + S3 reporting</li>
+        </ul>
+      </div>
+      <div class="stack-card">
+        <div class="stack-icon">🤖</div>
+        <h3>AI in Testing</h3>
+        <ul>
+          <li>MCP agents &amp; subagents</li>
+          <li>Claude Code workflows</li>
+          <li>GenAI test scaffolding</li>
+          <li>LLM-assisted triage</li>
+        </ul>
+      </div>
+      <div class="stack-card">
+        <div class="stack-icon">🗄️</div>
+        <h3>Data &amp; Tracking</h3>
+        <ul>
+          <li>SQL queries for QA</li>
+          <li>JIRA / Confluence</li>
+          <li>TestLink</li>
+          <li>Allure reporting</li>
+        </ul>
+      </div>
+      <div class="stack-card">
+        <div class="stack-icon">🧠</div>
+        <h3>Methodology</h3>
+        <ul>
+          <li>Agile / Scrum</li>
+          <li>BDD &amp; risk-based testing</li>
+          <li>Shift-left mindset</li>
+          <li>Mentoring &amp; code reviews</li>
         </ul>
       </div>
     </div>
   </div>
 </section>
 
-<!-- SKILLS -->
-<section id="skills" class="section section-alt">
+<!-- TEST LAB -->
+<section id="lab" class="section">
   <div class="container">
-    <p class="section-eyebrow">02 — Skills</p>
-    <h2 class="section-title">What I work with</h2>
-    <div class="skills-grid">
-      <div class="skill-card">
-        <div class="skill-icon">🎭</div>
-        <h3>Test Automation</h3>
-        <div class="skill-tags">
-          <span>Playwright</span><span>Cypress</span><span>Selenium WebDriver</span><span>POM</span><span>Data-Driven</span>
+    <div class="section-head">
+      <p class="eyebrow">03 / Test Lab</p>
+      <h2 class="section-title">A little playground 🧪</h2>
+      <p class="section-lead">Because every QA portfolio should let <em>you</em> run a test. Four mini-tools, zero installs.</p>
+    </div>
+
+    <div class="lab-grid">
+      <!-- Bug Squasher -->
+      <div class="lab-card">
+        <div class="lab-head">
+          <h3>🐛 Bug Squasher</h3>
+          <span class="lab-pill">mini-game</span>
+        </div>
+        <p class="lab-desc">Hunt bugs before the build breaks. Squash as many as you can in 20 seconds.</p>
+        <div class="bug-stats">
+          <div><span>Score</span><b id="bug-score">0</b></div>
+          <div><span>Time</span><b id="bug-time">20</b>s</div>
+          <div><span>Best</span><b id="bug-best">0</b></div>
+        </div>
+        <div class="bug-arena" id="bug-arena" aria-label="Bug squashing arena"></div>
+        <button id="bug-start" class="btn btn-primary btn-sm">Start hunt</button>
+      </div>
+
+      <!-- Locator Playground -->
+      <div class="lab-card">
+        <div class="lab-head">
+          <h3>🎯 Locator Playground</h3>
+          <span class="lab-pill">CSS / XPath</span>
+        </div>
+        <p class="lab-desc">Type a CSS selector or XPath. Live-highlights matches in the sample DOM.</p>
+        <div class="loc-controls">
+          <select id="loc-type">
+            <option value="css">CSS</option>
+            <option value="xpath">XPath</option>
+          </select>
+          <input id="loc-input" type="text" placeholder='e.g.  button.primary  or  //li[@data-status="open"]' />
+        </div>
+        <div class="loc-result" id="loc-result">0 matches</div>
+        <div class="loc-dom" id="loc-dom">
+          <div class="card">
+            <h4 data-testid="title">Sample Page</h4>
+            <button class="primary" data-testid="cta">Sign up</button>
+            <button class="ghost">Cancel</button>
+            <ul>
+              <li data-status="open">Bug #101 — login regression</li>
+              <li data-status="closed">Bug #102 — typo on footer</li>
+              <li data-status="open">Bug #103 — flaky checkout</li>
+              <li data-status="open">Bug #104 — API 500 on retry</li>
+            </ul>
+          </div>
         </div>
       </div>
-      <div class="skill-card">
-        <div class="skill-icon">🔌</div>
-        <h3>API &amp; Performance</h3>
-        <div class="skill-tags">
-          <span>Postman</span><span>Playwright API</span><span>REST (JSON/XML)</span><span>Locust.py</span><span>Contract Testing</span>
+
+      <!-- Flaky Test Simulator -->
+      <div class="lab-card">
+        <div class="lab-head">
+          <h3>🎲 Flaky Test Simulator</h3>
+          <span class="lab-pill">stats</span>
         </div>
+        <p class="lab-desc">Run a "flaky" test N times and watch the pass rate stabilize. Try smart-retry.</p>
+        <div class="flaky-controls">
+          <label>Flakiness <input id="flaky-rate" type="range" min="0" max="100" value="20" /><span id="flaky-rate-v">20%</span></label>
+          <label>Runs <input id="flaky-runs" type="number" min="1" max="500" value="50" /></label>
+          <label class="check"><input id="flaky-retry" type="checkbox" /> Smart retry (×2)</label>
+        </div>
+        <button id="flaky-run" class="btn btn-primary btn-sm">Run suite</button>
+        <div class="flaky-grid" id="flaky-grid" aria-label="Test run results"></div>
+        <div class="flaky-summary" id="flaky-summary">Pass rate: <b>—</b></div>
       </div>
-      <div class="skill-card">
-        <div class="skill-icon">⚙️</div>
-        <h3>CI/CD &amp; DevOps</h3>
-        <div class="skill-tags">
-          <span>Jenkins</span><span>Bitbucket Pipelines</span><span>Git</span><span>AWS EC2</span><span>AWS S3</span>
+
+      <!-- Regex Asserter -->
+      <div class="lab-card">
+        <div class="lab-head">
+          <h3>🧬 Regex Asserter</h3>
+          <span class="lab-pill">live</span>
         </div>
-      </div>
-      <div class="skill-card">
-        <div class="skill-icon">🤖</div>
-        <h3>AI &amp; Tooling</h3>
-        <div class="skill-tags">
-          <span>Generative AI</span><span>MCP Agents</span><span>Claude Code</span><span>AI Scaffolding</span>
+        <p class="lab-desc">Test the regex you'd put in an assertion. Highlights matches as you type.</p>
+        <div class="rx-controls">
+          <span class="rx-slash">/</span>
+          <input id="rx-pattern" type="text" value="ORD-\d{4,}" />
+          <span class="rx-slash">/</span>
+          <input id="rx-flags" type="text" value="gi" class="rx-flags" maxlength="6" />
         </div>
-      </div>
-      <div class="skill-card">
-        <div class="skill-icon">🗄️</div>
-        <h3>Database &amp; Tools</h3>
-        <div class="skill-tags">
-          <span>SQL</span><span>JIRA</span><span>TestLink</span><span>Confluence</span><span>Allure Reports</span>
-        </div>
-      </div>
-      <div class="skill-card">
-        <div class="skill-icon">💻</div>
-        <h3>Platforms</h3>
-        <div class="skill-tags">
-          <span>Windows</span><span>Ubuntu</span><span>Android</span><span>Kali Linux</span>
-        </div>
+        <textarea id="rx-text" rows="5">Order ORD-12345 was placed.
+Invoice ord-9981 is paid.
+Skip ORD-12 — too short.
+Confirmed ORD-7777771.</textarea>
+        <div class="rx-result" id="rx-result">0 matches</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- EXPERIENCE -->
-<section id="experience" class="section">
+<!-- JOURNEY / TIMELINE -->
+<section id="journey" class="section section-alt">
   <div class="container">
-    <p class="section-eyebrow">03 — Experience</p>
-    <h2 class="section-title">My journey</h2>
-    <div class="timeline">
-      <div class="t-item">
-        <div class="t-dot"></div>
-        <div class="t-content">
-          <div class="t-header">
-            <h3>QA Engineer — Playwright Era</h3>
-            <span class="t-date">2024 — Present</span>
-          </div>
-          <p class="t-company">WiseTech Global · Customs Management</p>
-          <ul>
-            <li>Architected modern <strong>Playwright</strong> cross-browser framework using <strong>AI agents (MCP)</strong> &amp; Generative AI.</li>
-            <li>Engineered robust REST API automation with JSON/XML validation, auth flows, schema checks.</li>
-            <li>Built <strong>Locust.py</strong> performance suites simulating concurrent users to find production bottlenecks.</li>
-            <li>Configured Jenkins CI/CD with Allure dashboards for real-time quality visibility.</li>
-          </ul>
-        </div>
-      </div>
-      <div class="t-item">
-        <div class="t-dot"></div>
-        <div class="t-content">
-          <div class="t-header">
-            <h3>QA Engineer — Cypress Era</h3>
-            <span class="t-date">2023 — 2024</span>
-          </div>
-          <p class="t-company">Blujay Solutions / E2open · Customs Management</p>
-          <ul>
-            <li>Built a <strong>Cypress framework from scratch</strong> using Page Object Model with reusable components.</li>
-            <li>Integrated Cypress into <strong>Bitbucket Pipelines</strong> for PR-gated regression runs.</li>
-            <li>Optimized test execution via custom commands and intelligent wait strategies.</li>
-          </ul>
-        </div>
-      </div>
-      <div class="t-item">
-        <div class="t-dot"></div>
-        <div class="t-content">
-          <div class="t-header">
-            <h3>QA Engineer — Selenium Era</h3>
-            <span class="t-date">2021 — 2023</span>
-          </div>
-          <p class="t-company">Blujay Solutions · Customs Management</p>
-          <ul>
-            <li>Maintained and enhanced existing <strong>Selenium WebDriver</strong> regression suites.</li>
-            <li>Performed manual functional, integration &amp; E2E testing across QA/Stage/Demo.</li>
-            <li>Logged critical defects in JIRA with high valid-defect rate; participated in triage.</li>
-          </ul>
-        </div>
-      </div>
-      <div class="t-item">
-        <div class="t-dot"></div>
-        <div class="t-content">
-          <div class="t-header">
-            <h3>B.Tech</h3>
-            <span class="t-date">2014 — 2018</span>
-          </div>
-          <p class="t-company">Jawaharlal Nehru Technological University (JNTU)</p>
-        </div>
-      </div>
+    <div class="section-head">
+      <p class="eyebrow">04 / Journey</p>
+      <h2 class="section-title">From Selenium to AI agents</h2>
     </div>
+    <ol class="timeline">
+      <li>
+        <span class="t-year">2024 — Now</span>
+        <h3>QA Engineer · Playwright + AI era</h3>
+        <p class="t-co">WiseTech Global · Customs Management</p>
+        <ul>
+          <li>Architected modern Playwright cross-browser framework using <b>MCP agents</b> &amp; GenAI scaffolding.</li>
+          <li>Built robust REST API automation (JSON/XML, auth, schema, negative paths).</li>
+          <li>Designed Locust.py performance suites to find production bottlenecks.</li>
+          <li>Configured Jenkins CI/CD with Allure dashboards for real-time quality signals.</li>
+        </ul>
+      </li>
+      <li>
+        <span class="t-year">2023 — 2024</span>
+        <h3>QA Engineer · Cypress era</h3>
+        <p class="t-co">Blujay → E2open</p>
+        <ul>
+          <li>Built a Cypress framework from scratch using POM &amp; reusable commands.</li>
+          <li>Integrated with Bitbucket Pipelines for PR-gated regression runs.</li>
+          <li>Optimized execution time via custom commands &amp; intelligent waits.</li>
+        </ul>
+      </li>
+      <li>
+        <span class="t-year">2021 — 2023</span>
+        <h3>QA Engineer · Selenium era</h3>
+        <p class="t-co">Blujay Solutions</p>
+        <ul>
+          <li>Maintained &amp; enhanced Selenium WebDriver regression suites.</li>
+          <li>Manual functional, integration &amp; E2E testing across environments.</li>
+          <li>High valid-defect rate in JIRA; active triage participant.</li>
+        </ul>
+      </li>
+      <li>
+        <span class="t-year">2014 — 2018</span>
+        <h3>B.Tech</h3>
+        <p class="t-co">Jawaharlal Nehru Technological University (JNTU)</p>
+      </li>
+    </ol>
   </div>
 </section>
 
-<!-- PROJECTS -->
-<section id="projects" class="section section-alt">
+<!-- TESTIMONIAL / QUOTE STRIP -->
+<section class="quote-strip">
   <div class="container">
-    <p class="section-eyebrow">04 — Projects</p>
-    <h2 class="section-title">Selected work</h2>
-    <div class="projects-grid">
-      <article class="project-card">
-        <div class="project-tag">Flagship</div>
-        <h3>AI-Driven Playwright Framework</h3>
-        <p>Cross-browser E2E framework scaffolded with MCP agents &amp; GenAI. Cut setup time from weeks to days, covering critical customs workflows across QA/Stage/Demo.</p>
-        <div class="project-tech">
-          <span>Playwright</span><span>MCP</span><span>POM</span><span>Allure</span>
-        </div>
-      </article>
-      <article class="project-card">
-        <h3>Cypress E2E Framework</h3>
-        <p>Built from scratch with POM, reusable commands, and Bitbucket Pipelines integration for PR-gated regression — significantly reduced maintenance overhead.</p>
-        <div class="project-tech">
-          <span>Cypress</span><span>Bitbucket</span><span>POM</span>
-        </div>
-      </article>
-      <article class="project-card">
-        <h3>REST API Automation Suite</h3>
-        <p>Comprehensive API tests over JSON/XML with authentication, schema, contract, and negative path coverage using Postman &amp; Playwright APIRequestContext.</p>
-        <div class="project-tech">
-          <span>Postman</span><span>Playwright API</span><span>JSON</span><span>XML</span>
-        </div>
-      </article>
-      <article class="project-card">
-        <h3>Locust Performance Suite</h3>
-        <p>Load &amp; performance tests for customs APIs simulating concurrent users — identified throughput, latency and stability bottlenecks pre-production.</p>
-        <div class="project-tech">
-          <span>Locust.py</span><span>Python</span><span>REST</span>
-        </div>
-      </article>
-      <article class="project-card">
-        <h3>Jenkins CI/CD &amp; Allure Dashboards</h3>
-        <p>Scheduled test execution pipelines feeding Allure reports — real-time quality metrics for go/no-go release decisions.</p>
-        <div class="project-tech">
-          <span>Jenkins</span><span>Allure</span><span>AWS</span>
-        </div>
-      </article>
-      <article class="project-card">
-        <h3>AI Fluency Learning Track</h3>
-        <p>Completed 11 AI courses — Prompt Engineering, Claude Code, MCP, Agent Skills, Subagents, AI Capabilities &amp; Limitations — applied directly to QA tooling.</p>
-        <div class="project-tech">
-          <span>Claude</span><span>MCP</span><span>Agents</span>
-        </div>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- CERTIFICATIONS -->
-<section id="certs" class="section">
-  <div class="container">
-    <p class="section-eyebrow">05 — Certifications</p>
-    <h2 class="section-title">Continuous learning</h2>
-    <div class="cert-grid">
-      <div class="cert">Prompt Engineering</div>
-      <div class="cert">Claude 101</div>
-      <div class="cert">Claude Code 101</div>
-      <div class="cert">Claude Cowork</div>
-      <div class="cert">Claude Code in Action</div>
-      <div class="cert">AI Fluency: Framework &amp; Foundations</div>
-      <div class="cert">Building with the Claude API</div>
-      <div class="cert">Model Context Protocol</div>
-      <div class="cert">Agent Skills</div>
-      <div class="cert">Subagents</div>
-      <div class="cert">AI Capabilities &amp; Limitations</div>
-    </div>
+    <blockquote>
+      "Quality isn't a stage in the pipeline — it's the pipeline."
+    </blockquote>
+    <p class="q-author">— a thing I actually believe</p>
   </div>
 </section>
 
 <!-- CONTACT -->
-<section id="contact" class="section section-alt">
-  <div class="container contact-wrap">
-    <p class="section-eyebrow">06 — Contact</p>
-    <h2 class="section-title">Let's <span class="grad-text">build quality</span> together</h2>
-    <p class="contact-lead">
-      Open to QA Automation / SDET roles, freelance framework builds, and AI-in-testing collaborations.
-    </p>
+<section id="contact" class="section">
+  <div class="container contact">
+    <div>
+      <p class="eyebrow">05 / Contact</p>
+      <h2 class="section-title">Let's build something <span class="accent">unbreakable.</span></h2>
+      <p class="section-lead">Open to QA Automation roles, framework builds, and AI-in-testing collaborations.</p>
+    </div>
     <div class="contact-cards">
-      <a href="mailto:rakesh.lella@gmail.com" class="contact-card">
-        <span class="c-icon">✉️</span>
-        <div>
-          <strong>Email</strong>
-          <p>rakesh.lella@gmail.com</p>
-        </div>
+      <a href="mailto:rakesh.lella@gmail.com" class="c-card">
+        <span class="c-ic">✉️</span>
+        <div><b>Email</b><p>rakesh.lella@gmail.com</p></div>
       </a>
-      <a href="tel:+918639137010" class="contact-card">
-        <span class="c-icon">📱</span>
-        <div>
-          <strong>Phone</strong>
-          <p>+91 86391 37010</p>
-        </div>
+      <a href="tel:+918639137010" class="c-card">
+        <span class="c-ic">📱</span>
+        <div><b>Phone</b><p>+91 86391 37010</p></div>
       </a>
-      <a href="assets/RakeshLella_Resume.pdf" download class="contact-card">
-        <span class="c-icon">📄</span>
-        <div>
-          <strong>Resume</strong>
-          <p>Download PDF</p>
-        </div>
+      <a href="assets/RakeshLella_Resume.pdf" download class="c-card">
+        <span class="c-ic">📄</span>
+        <div><b>Resume</b><p>Download PDF</p></div>
       </a>
     </div>
   </div>
 </section>
 
 <footer class="footer">
-  <p>© <span id="year"></span> Rakesh L · Crafted with ❤️ and a lot of automated tests.</p>
+  <div class="container footer-inner">
+    <p>© <span id="year"></span> Rakesh L · Built &amp; tested by hand. <span class="mono">// no flaky tests were harmed</span></p>
+    <a href="#top" class="to-top">Back to top ↑</a>
+  </div>
 </footer>
 
 <script src="script.js"></script>

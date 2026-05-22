@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  
+    <defs>
+      <pattern id="dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+        <circle cx="1.2" cy="1.2" r="1.2" fill="#cbd5e1" opacity="0.45"/>
+      </pattern>
+      <linearGradient id="accentLine" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#2563eb"/>
+        <stop offset="100%" stop-color="#14b8a6"/>
+      </linearGradient>
+      <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#fafafa" stop-opacity="1"/>
+        <stop offset="100%" stop-color="#fafafa" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <rect width="1200" height="630" fill="#fafafa"/>
+    <rect width="1200" height="630" fill="url(#dots)"/>
+    <rect width="1200" height="630" fill="url(#fade)"/>
+    
+  <!-- Big accent square -->
+  <rect x="80" y="80" width="60" height="60" fill="none" stroke="#2563eb" stroke-width="3"/>
+  <rect x="100" y="100" width="60" height="60" fill="#14b8a6" opacity="0.85"/>
+  <!-- Top label -->
+  <text x="200" y="125" font-family="JetBrains Mono, Consolas, monospace"
+        font-size="18" fill="#475569" font-weight="600">
+    rakesh-lella.github.io
+  </text>
+  <!-- Eyebrow -->
+  <text x="80" y="245" font-family="Inter, Segoe UI, sans-serif"
+        font-size="18" fill="#2563eb" font-weight="700" letter-spacing="3">
+    PORTFOLIO
+  </text>
+  <!-- Title -->
+  <text x="80" y="330" font-family="Inter, Segoe UI, sans-serif"
+        font-size="84" fill="#0f172a" font-weight="800">Rakesh L</text>
+  <text x="80" y="395" font-family="Inter, Segoe UI, sans-serif"
+        font-size="36" fill="#475569" font-weight="500">
+    QA Automation Engineer · SDET
+  </text>
+  <!-- Stack line -->
+  <rect x="80" y="430" width="80" height="3" fill="url(#accentLine)"/>
+  <text x="80" y="480" font-family="Inter, Segoe UI, sans-serif"
+        font-size="22" fill="#475569">
+    Playwright · Cypress · Selenium · API · Locust · Jenkins · AI / MCP
+  </text>
+  <!-- Bottom stats -->
+  <g transform="translate(80,540)" font-family="Inter, Segoe UI, sans-serif">
+    <text font-size="14" fill="#475569" letter-spacing="2" font-weight="600">EXPERIENCE</text>
+    <text y="34" font-size="28" fill="#0f172a" font-weight="800">5+ Years @ WiseTech Global</text>
+  </g>
+  <g transform="translate(1120,540)" text-anchor="end" font-family="Inter, Segoe UI, sans-serif">
+    <text font-size="14" fill="#475569" letter-spacing="2" font-weight="600">DOMAIN</text>
+    <text y="34" font-size="28" fill="#0f172a" font-weight="800">Customs / Logistics</text>
+  </g>
+</svg>
