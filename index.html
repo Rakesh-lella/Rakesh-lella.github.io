@@ -4,39 +4,62 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Rakesh L · QA Automation Engineer</title>
-<meta name="description" content="Rakesh L — QA Automation Engineer. Playwright, Cypress, Selenium, API & performance testing, AI-driven test frameworks. Interactive test lab inside." />
-<meta name="theme-color" content="#0b0d10" />
+<meta name="description" content="Rakesh L — QA Automation Engineer. Playwright, Cypress, Selenium, API & performance testing, AI-driven test frameworks. Play 6 interactive testing games inside." />
+<meta name="theme-color" content="#06070b" />
+<meta property="og:title" content="Rakesh L — QA Automation Engineer" />
+<meta property="og:description" content="Playwright · Cypress · Selenium · AI-driven testing. Interactive test lab with 6 mini-games." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://rakesh-lella.github.io/" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css" />
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2300d68f'/%3E%3Cpath d='M20 32l8 8 16-16' stroke='%230b0d10' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2310ffa0'/%3E%3Cpath d='M20 32l8 8 16-16' stroke='%2306070b' stroke-width='6' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
 </head>
-<body>
+<body class="loading">
 
-<!-- subtle grid background -->
-<div class="grid-bg" aria-hidden="true"></div>
+<!-- LOADING SCREEN -->
+<div class="loader" id="loader" aria-hidden="true">
+  <div class="loader-inner">
+    <div class="loader-mark">
+      <svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--accent)"/><path d="M20 32l8 8 16-16" stroke="#06070b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+    </div>
+    <div class="loader-log" id="loader-log"></div>
+    <div class="loader-bar"><span></span></div>
+  </div>
+</div>
+
+<!-- CUSTOM CURSOR -->
+<div class="cursor-dot" id="cursor-dot" aria-hidden="true"></div>
+<div class="cursor-ring" id="cursor-ring" aria-hidden="true"></div>
+
+<!-- SCROLL PROGRESS -->
+<div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+
+<!-- BACKGROUND -->
+<canvas class="bg-canvas" id="bg-canvas" aria-hidden="true"></canvas>
+<div class="bg-noise" aria-hidden="true"></div>
 
 <!-- NAV -->
-<nav class="nav">
+<nav class="nav" id="nav">
   <div class="nav-inner">
-    <a href="#top" class="brand">
+    <a href="#top" class="brand" data-magnetic>
       <span class="brand-mark">✓</span>
-      <span class="brand-text">rakesh<span class="brand-dim">.test</span></span>
+      <span class="brand-text">rakesh<span class="brand-dim">.qa</span></span>
     </a>
     <ul class="nav-links">
-      <li><a href="#work">Work</a></li>
-      <li><a href="#stack">Stack</a></li>
-      <li><a href="#lab">Test Lab</a></li>
-      <li><a href="#journey">Journey</a></li>
-      <li><a href="#contact">Contact</a></li>
+      <li><a href="#work" data-nav>Work</a></li>
+      <li><a href="#stack" data-nav>Stack</a></li>
+      <li><a href="#lab" data-nav>Test Lab</a></li>
+      <li><a href="#journey" data-nav>Journey</a></li>
+      <li><a href="#contact" data-nav>Contact</a></li>
     </ul>
     <div class="nav-actions">
-      <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme" title="Toggle theme">
+      <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme" title="Toggle theme" data-magnetic>
         <svg class="i-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         <svg class="i-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
-      <a href="assets/RakeshLella_Resume.pdf" download class="btn btn-primary btn-sm">Resume</a>
+      <a href="assets/RakeshLella_Resume.pdf" download class="btn btn-primary btn-sm" data-magnetic>Resume<span class="btn-arrow">↓</span></a>
     </div>
     <button class="nav-toggle" aria-label="Toggle menu"><span></span><span></span></button>
   </div>
@@ -46,143 +69,170 @@
 <header id="top" class="hero">
   <div class="container hero-inner">
     <div class="hero-left">
-      <div class="status-pill">
-        <span class="dot"></span> Available for QA Automation roles
+      <div class="status-pill" data-magnetic>
+        <span class="pulse-dot"></span> Available for QA Automation roles · Open to remote
       </div>
       <h1 class="hero-title">
-        I break software<br/>
-        <span class="accent">so users don't.</span>
+        <span class="line">I break</span>
+        <span class="line"><span class="serif">software</span></span>
+        <span class="line">so users <span class="hl">don't.</span></span>
       </h1>
       <p class="hero-sub">
-        I'm <strong>Rakesh L</strong> — a QA Engineer with 5+ years building automation frameworks in
+        I'm <strong>Rakesh L</strong> — a QA Engineer with <strong>5+ years</strong> architecting test frameworks across
         <span class="kbd">Playwright</span> <span class="kbd">Cypress</span> <span class="kbd">Selenium</span>,
-        designing API &amp; load tests, and shipping <strong>AI-augmented</strong> test ecosystems with MCP agents.
+        designing API &amp; load suites, and building <strong>AI-augmented</strong> testing pipelines with MCP agents &amp; Claude Code.
       </p>
       <div class="hero-cta">
-        <a href="#work" class="btn btn-primary">See my work →</a>
-        <a href="#lab" class="btn btn-ghost">Try the Test Lab 🧪</a>
+        <a href="#work" class="btn btn-primary" data-magnetic>See my work <span class="btn-arrow">→</span></a>
+        <a href="#lab" class="btn btn-ghost" data-magnetic>Play the Test Lab <span class="btn-arrow">🧪</span></a>
       </div>
-      <div class="hero-stats">
-        <div><b>5+</b><span>Years in QA</span></div>
-        <div><b>3</b><span>Frameworks built from scratch</span></div>
-        <div><b>11</b><span>AI / GenAI certifications</span></div>
-        <div><b>0</b><span>Flaky tests tolerated</span></div>
+      <div class="hero-meta">
+        <span><span class="meta-k">Currently</span> WiseTech Global</span>
+        <span class="dotdiv">·</span>
+        <span><span class="meta-k">Stack</span> Playwright + MCP agents</span>
+        <span class="dotdiv">·</span>
+        <span><span class="meta-k">Based in</span> India</span>
       </div>
     </div>
 
     <div class="hero-right">
-      <!-- Profile card -->
-      <div class="profile-card">
+      <div class="hero-card profile-card">
         <div class="avatar-wrap">
-          <div class="avatar-ring"></div>
-          <img src="assets/rakesh.jpeg" alt="Rakesh L — QA Automation Engineer" class="avatar" loading="eager" />
-          <span class="avatar-status" title="Available"></span>
+          <svg class="avatar-orbit" viewBox="0 0 220 220" aria-hidden="true">
+            <defs>
+              <linearGradient id="og" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stop-color="#10ffa0"/>
+                <stop offset="50%" stop-color="#7aa2ff"/>
+                <stop offset="100%" stop-color="#ffb86b"/>
+              </linearGradient>
+            </defs>
+            <circle cx="110" cy="110" r="100" fill="none" stroke="url(#og)" stroke-width="1.5" stroke-dasharray="3 8" opacity=".6"/>
+            <circle cx="110" cy="110" r="92" fill="none" stroke="url(#og)" stroke-width="1.5" opacity=".25"/>
+          </svg>
+          <img src="assets/rakesh.jpeg" alt="Rakesh L" class="avatar" loading="eager" />
+          <span class="avatar-status" title="Available now"></span>
         </div>
         <div class="profile-info">
           <h3>Rakesh L</h3>
-          <p>QA Automation Engineer</p>
+          <p class="profile-role">QA Automation Engineer</p>
           <ul class="profile-meta">
-            <li>📍 India</li>
-            <li>💼 WiseTech Global</li>
-            <li>🎓 B.Tech, JNTU</li>
+            <li><span>📍</span> India</li>
+            <li><span>💼</span> WiseTech Global</li>
+            <li><span>🎓</span> B.Tech, JNTU</li>
+            <li><span>🧠</span> 11× AI / GenAI certs</li>
           </ul>
         </div>
       </div>
-      <!-- Terminal card -->
-      <div class="terminal" aria-hidden="true">
+
+      <div class="hero-card terminal-card">
         <div class="term-bar">
           <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-          <span class="term-title">rakesh@qa — playwright test</span>
+          <span class="term-title">rakesh@qa — playwright test --reporter=line</span>
         </div>
         <pre class="term-body"><code id="term-code"></code><span class="caret">▌</span></pre>
       </div>
-      <!-- floating badges -->
-      <div class="float-badge b1">✓ 0 flaky</div>
-      <div class="float-badge b2">⚡ 12.4s</div>
-      <div class="float-badge b3">🤖 MCP agent ready</div>
     </div>
+  </div>
+
+  <div class="hero-scroll" aria-hidden="true">
+    <span class="hs-text">Scroll</span>
+    <span class="hs-line"></span>
   </div>
 </header>
 
 <!-- MARQUEE -->
 <div class="marquee" aria-hidden="true">
   <div class="marquee-track">
-    <span>Playwright</span><span>·</span>
-    <span>Cypress</span><span>·</span>
-    <span>Selenium</span><span>·</span>
-    <span>TypeScript</span><span>·</span>
-    <span>Python</span><span>·</span>
-    <span>Locust</span><span>·</span>
-    <span>Postman</span><span>·</span>
-    <span>Jenkins</span><span>·</span>
-    <span>Allure</span><span>·</span>
-    <span>MCP Agents</span><span>·</span>
-    <span>Claude Code</span><span>·</span>
-    <span>AWS</span><span>·</span>
-    <span>Playwright</span><span>·</span>
-    <span>Cypress</span><span>·</span>
-    <span>Selenium</span><span>·</span>
-    <span>TypeScript</span><span>·</span>
-    <span>Python</span><span>·</span>
-    <span>Locust</span><span>·</span>
-    <span>Postman</span><span>·</span>
-    <span>Jenkins</span><span>·</span>
-    <span>Allure</span><span>·</span>
-    <span>MCP Agents</span><span>·</span>
+    <span>Playwright</span><span>✦</span>
+    <span>Cypress</span><span>✦</span>
+    <span>Selenium</span><span>✦</span>
+    <span>TypeScript</span><span>✦</span>
+    <span>Python</span><span>✦</span>
+    <span>Locust</span><span>✦</span>
+    <span>Postman</span><span>✦</span>
+    <span>Jenkins</span><span>✦</span>
+    <span>Allure</span><span>✦</span>
+    <span>MCP Agents</span><span>✦</span>
+    <span>Claude Code</span><span>✦</span>
+    <span>AWS</span><span>✦</span>
+    <span>Playwright</span><span>✦</span>
+    <span>Cypress</span><span>✦</span>
+    <span>Selenium</span><span>✦</span>
+    <span>TypeScript</span><span>✦</span>
+    <span>Python</span><span>✦</span>
+    <span>Locust</span><span>✦</span>
+    <span>Postman</span><span>✦</span>
+    <span>Jenkins</span><span>✦</span>
+    <span>Allure</span><span>✦</span>
+    <span>MCP Agents</span><span>✦</span>
   </div>
 </div>
 
-<!-- WORK / FEATURED PROJECTS -->
+<!-- STATS STRIP -->
+<section class="stats-strip">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat"><b data-count="5" data-suffix="+">0</b><span>Years in QA</span></div>
+      <div class="stat"><b data-count="3">0</b><span>Frameworks from scratch</span></div>
+      <div class="stat"><b data-count="11">0</b><span>AI · GenAI certifications</span></div>
+      <div class="stat"><b data-count="120" data-suffix="+">0</b><span>E2E flows automated</span></div>
+      <div class="stat"><b data-count="0" data-suffix="%">0</b><span>Flaky tests tolerated</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- WORK -->
 <section id="work" class="section">
   <div class="container">
     <div class="section-head">
-      <p class="eyebrow">01 / Selected Work</p>
-      <h2 class="section-title">Frameworks &amp; pipelines I've shipped</h2>
-      <p class="section-lead">Production-grade automation across customs &amp; logistics platforms used by Shell, FedEx, and Sunny.</p>
+      <p class="eyebrow"><span class="eyebrow-num">01</span> Selected Work</p>
+      <h2 class="section-title">Frameworks &amp; pipelines<br/><span class="serif">I've shipped.</span></h2>
+      <p class="section-lead">Production automation across customs &amp; logistics platforms used by Shell, FedEx, and Sunny — running in QA, Stage, and Demo every day.</p>
     </div>
 
-    <div class="work-grid">
-      <article class="work-card featured">
-        <div class="work-tag">Flagship</div>
+    <div class="bento">
+      <article class="bento-card bento-feature">
+        <div class="bento-glow"></div>
+        <div class="bento-tag">Flagship</div>
         <h3>AI-Driven Playwright Framework</h3>
-        <p>Cross-browser E2E scaffolded with MCP agents &amp; GenAI. Cut framework setup from weeks to days, covering critical customs workflows across QA / Stage / Demo.</p>
-        <ul class="kv">
-          <li><b>Setup time</b><span>−85%</span></li>
-          <li><b>Coverage</b><span>120+ flows</span></li>
-          <li><b>Browsers</b><span>3 + mobile</span></li>
-        </ul>
+        <p>Cross-browser E2E framework scaffolded with <b>MCP agents</b> and Generative AI. Reduced framework spin-up by ~85%, covering critical customs declaration flows across three environments.</p>
+        <div class="metrics">
+          <div><b data-count="85" data-suffix="%">0</b><span>Setup time cut</span></div>
+          <div><b data-count="120" data-suffix="+">0</b><span>Flows covered</span></div>
+          <div><b data-count="3">0</b><span>Browsers + mobile</span></div>
+        </div>
         <div class="chips">
-          <span>Playwright</span><span>TypeScript</span><span>MCP</span><span>Allure</span><span>POM</span>
+          <span>Playwright</span><span>TypeScript</span><span>MCP</span><span>Claude Code</span><span>Allure</span><span>POM</span>
         </div>
       </article>
 
-      <article class="work-card">
+      <article class="bento-card">
         <h3>REST API Automation Suite</h3>
-        <p>JSON / XML contract tests, auth flows, schema validation &amp; negative paths using Playwright APIRequestContext + Postman.</p>
+        <p>JSON / XML contract tests, auth flows, schema validation &amp; negative paths via Playwright APIRequestContext + Postman.</p>
         <div class="chips"><span>Playwright API</span><span>Postman</span><span>JSON</span><span>XML</span></div>
       </article>
 
-      <article class="work-card">
+      <article class="bento-card">
         <h3>Locust Performance Suite</h3>
-        <p>Load tests simulating concurrent users — surfaced throughput &amp; latency bottlenecks in customs APIs pre-production.</p>
+        <p>Load &amp; soak tests simulating concurrent users. Surfaced throughput &amp; latency bottlenecks pre-production.</p>
         <div class="chips"><span>Locust.py</span><span>Python</span><span>REST</span></div>
       </article>
 
-      <article class="work-card">
+      <article class="bento-card">
         <h3>Cypress E2E Framework</h3>
-        <p>Built from scratch with POM, custom commands &amp; Bitbucket Pipelines integration for PR-gated regression runs.</p>
+        <p>Built from scratch with POM, reusable commands &amp; Bitbucket Pipelines for PR-gated regression.</p>
         <div class="chips"><span>Cypress</span><span>Bitbucket</span><span>POM</span></div>
       </article>
 
-      <article class="work-card">
-        <h3>Jenkins CI/CD + Allure</h3>
-        <p>Scheduled cross-env pipelines feeding Allure dashboards — real-time quality metrics for release go / no-go.</p>
-        <div class="chips"><span>Jenkins</span><span>Allure</span><span>AWS</span></div>
+      <article class="bento-card bento-wide">
+        <h3>Jenkins CI/CD + Allure Dashboards</h3>
+        <p>Multi-env pipelines feeding Allure dashboards on S3 — real-time quality signals for release go / no-go decisions.</p>
+        <div class="chips"><span>Jenkins</span><span>Allure</span><span>AWS S3</span><span>EC2</span></div>
       </article>
 
-      <article class="work-card">
+      <article class="bento-card">
         <h3>AI Fluency Track</h3>
-        <p>11 certifications across Prompt Engineering, Claude Code, MCP, Agents &amp; Subagents — applied directly to QA tooling.</p>
+        <p>11 certifications: Prompt Engineering, Claude Code, MCP, Agent Skills, Subagents, AI Capabilities &amp; Limitations.</p>
         <div class="chips"><span>Claude</span><span>MCP</span><span>Agents</span></div>
       </article>
     </div>
@@ -193,70 +243,16 @@
 <section id="stack" class="section section-alt">
   <div class="container">
     <div class="section-head">
-      <p class="eyebrow">02 / Stack</p>
-      <h2 class="section-title">My testing toolkit</h2>
+      <p class="eyebrow"><span class="eyebrow-num">02</span> Stack</p>
+      <h2 class="section-title">My testing<br/><span class="serif">toolkit.</span></h2>
     </div>
     <div class="stack-grid">
-      <div class="stack-card">
-        <div class="stack-icon">🎭</div>
-        <h3>Automation</h3>
-        <ul>
-          <li>Playwright (TS / Python)</li>
-          <li>Cypress</li>
-          <li>Selenium WebDriver</li>
-          <li>POM &amp; data-driven design</li>
-        </ul>
-      </div>
-      <div class="stack-card">
-        <div class="stack-icon">🔌</div>
-        <h3>API &amp; Performance</h3>
-        <ul>
-          <li>Playwright APIRequestContext</li>
-          <li>Postman / Newman</li>
-          <li>Locust.py load testing</li>
-          <li>Contract &amp; schema validation</li>
-        </ul>
-      </div>
-      <div class="stack-card">
-        <div class="stack-icon">⚙️</div>
-        <h3>CI / CD</h3>
-        <ul>
-          <li>Jenkins pipelines</li>
-          <li>Bitbucket Pipelines</li>
-          <li>Git / GitHub Actions</li>
-          <li>AWS EC2 + S3 reporting</li>
-        </ul>
-      </div>
-      <div class="stack-card">
-        <div class="stack-icon">🤖</div>
-        <h3>AI in Testing</h3>
-        <ul>
-          <li>MCP agents &amp; subagents</li>
-          <li>Claude Code workflows</li>
-          <li>GenAI test scaffolding</li>
-          <li>LLM-assisted triage</li>
-        </ul>
-      </div>
-      <div class="stack-card">
-        <div class="stack-icon">🗄️</div>
-        <h3>Data &amp; Tracking</h3>
-        <ul>
-          <li>SQL queries for QA</li>
-          <li>JIRA / Confluence</li>
-          <li>TestLink</li>
-          <li>Allure reporting</li>
-        </ul>
-      </div>
-      <div class="stack-card">
-        <div class="stack-icon">🧠</div>
-        <h3>Methodology</h3>
-        <ul>
-          <li>Agile / Scrum</li>
-          <li>BDD &amp; risk-based testing</li>
-          <li>Shift-left mindset</li>
-          <li>Mentoring &amp; code reviews</li>
-        </ul>
-      </div>
+      <div class="stack-card"><div class="stack-icon">🎭</div><h3>Automation</h3><ul><li>Playwright (TS / Python)</li><li>Cypress</li><li>Selenium WebDriver</li><li>POM &amp; data-driven design</li></ul></div>
+      <div class="stack-card"><div class="stack-icon">🔌</div><h3>API &amp; Performance</h3><ul><li>Playwright APIRequestContext</li><li>Postman / Newman</li><li>Locust.py load testing</li><li>Contract &amp; schema validation</li></ul></div>
+      <div class="stack-card"><div class="stack-icon">⚙️</div><h3>CI / CD</h3><ul><li>Jenkins pipelines</li><li>Bitbucket Pipelines</li><li>GitHub Actions</li><li>AWS EC2 + S3 reporting</li></ul></div>
+      <div class="stack-card"><div class="stack-icon">🤖</div><h3>AI in Testing</h3><ul><li>MCP agents &amp; subagents</li><li>Claude Code workflows</li><li>GenAI test scaffolding</li><li>LLM-assisted triage</li></ul></div>
+      <div class="stack-card"><div class="stack-icon">🗄️</div><h3>Data &amp; Tracking</h3><ul><li>SQL queries for QA</li><li>JIRA / Confluence</li><li>TestLink</li><li>Allure reporting</li></ul></div>
+      <div class="stack-card"><div class="stack-icon">🧠</div><h3>Methodology</h3><ul><li>Agile / Scrum</li><li>BDD &amp; risk-based testing</li><li>Shift-left mindset</li><li>Mentoring &amp; code reviews</li></ul></div>
     </div>
   </div>
 </section>
@@ -265,104 +261,167 @@
 <section id="lab" class="section">
   <div class="container">
     <div class="section-head">
-      <p class="eyebrow">03 / Test Lab</p>
-      <h2 class="section-title">A little playground 🧪</h2>
-      <p class="section-lead">Because every QA portfolio should let <em>you</em> run a test. Four mini-tools, zero installs.</p>
+      <p class="eyebrow"><span class="eyebrow-num">03</span> Test Lab</p>
+      <h2 class="section-title">Six mini-games.<br/><span class="serif">Built for testers.</span></h2>
+      <p class="section-lead">Because every QA portfolio should let <em>you</em> run a test. Pick a game — high scores save locally.</p>
     </div>
 
-    <div class="lab-grid">
-      <!-- Bug Squasher -->
-      <div class="lab-card">
-        <div class="lab-head">
-          <h3>🐛 Bug Squasher</h3>
-          <span class="lab-pill">mini-game</span>
-        </div>
-        <p class="lab-desc">Hunt bugs before the build breaks. Squash as many as you can in 20 seconds.</p>
-        <div class="bug-stats">
-          <div><span>Score</span><b id="bug-score">0</b></div>
-          <div><span>Time</span><b id="bug-time">20</b>s</div>
-          <div><span>Best</span><b id="bug-best">0</b></div>
-        </div>
-        <div class="bug-arena" id="bug-arena" aria-label="Bug squashing arena"></div>
-        <button id="bug-start" class="btn btn-primary btn-sm">Start hunt</button>
+    <div class="lab">
+      <div class="lab-tabs" role="tablist">
+        <button class="lab-tab is-active" data-tab="bug" role="tab" aria-selected="true">🐛<span>Bug Hunt</span></button>
+        <button class="lab-tab" data-tab="selector" role="tab">🎯<span>Selector Master</span></button>
+        <button class="lab-tab" data-tab="flaky" role="tab">🎲<span>Flaky Storm</span></button>
+        <button class="lab-tab" data-tab="regex" role="tab">🧬<span>Regex Wizard</span></button>
+        <button class="lab-tab" data-tab="ci" role="tab">⚡<span>CI Builder</span></button>
+        <button class="lab-tab" data-tab="diff" role="tab">🔍<span>Spot the Bug</span></button>
       </div>
 
-      <!-- Locator Playground -->
-      <div class="lab-card">
-        <div class="lab-head">
-          <h3>🎯 Locator Playground</h3>
-          <span class="lab-pill">CSS / XPath</span>
-        </div>
-        <p class="lab-desc">Type a CSS selector or XPath. Live-highlights matches in the sample DOM.</p>
-        <div class="loc-controls">
-          <select id="loc-type">
-            <option value="css">CSS</option>
-            <option value="xpath">XPath</option>
-          </select>
-          <input id="loc-input" type="text" placeholder='e.g.  button.primary  or  //li[@data-status="open"]' />
-        </div>
-        <div class="loc-result" id="loc-result">0 matches</div>
-        <div class="loc-dom" id="loc-dom">
-          <div class="card">
-            <h4 data-testid="title">Sample Page</h4>
-            <button class="primary" data-testid="cta">Sign up</button>
-            <button class="ghost">Cancel</button>
-            <ul>
-              <li data-status="open">Bug #101 — login regression</li>
-              <li data-status="closed">Bug #102 — typo on footer</li>
-              <li data-status="open">Bug #103 — flaky checkout</li>
-              <li data-status="open">Bug #104 — API 500 on retry</li>
-            </ul>
+      <!-- BUG HUNT -->
+      <div class="lab-panel is-active" data-panel="bug" role="tabpanel">
+        <div class="panel-head">
+          <div>
+            <h3>🐛 Bug Hunt</h3>
+            <p>Squash bugs before they ship. Combo bonus for rapid hits. <b>30 seconds</b>.</p>
+          </div>
+          <div class="panel-stats">
+            <div><span>Score</span><b id="bug-score">0</b></div>
+            <div><span>Combo</span><b id="bug-combo">×1</b></div>
+            <div><span>Time</span><b id="bug-time">30</b></div>
+            <div><span>Best</span><b id="bug-best">0</b></div>
           </div>
         </div>
+        <div class="bug-arena" id="bug-arena" aria-label="Bug arena"></div>
+        <div class="panel-foot">
+          <button id="bug-start" class="btn btn-primary btn-sm" data-magnetic>Start hunt</button>
+          <span class="hint">Tip: chain hits within 1.2s for a combo multiplier.</span>
+        </div>
       </div>
 
-      <!-- Flaky Test Simulator -->
-      <div class="lab-card">
-        <div class="lab-head">
-          <h3>🎲 Flaky Test Simulator</h3>
-          <span class="lab-pill">stats</span>
+      <!-- SELECTOR MASTER -->
+      <div class="lab-panel" data-panel="selector" role="tabpanel">
+        <div class="panel-head">
+          <div>
+            <h3>🎯 Selector Master</h3>
+            <p>Write the CSS or XPath that selects <b>only</b> the highlighted elements.</p>
+          </div>
+          <div class="panel-stats">
+            <div><span>Level</span><b id="sel-level">1</b><span class="dim">/8</span></div>
+            <div><span>Score</span><b id="sel-score">0</b></div>
+            <div><span>Best</span><b id="sel-best">0</b></div>
+          </div>
         </div>
-        <p class="lab-desc">Run a "flaky" test N times and watch the pass rate stabilize. Try smart-retry.</p>
+        <div class="sel-task" id="sel-task"></div>
+        <div class="sel-dom" id="sel-dom"></div>
+        <div class="sel-controls">
+          <select id="sel-type" aria-label="Selector type"><option value="css">CSS</option><option value="xpath">XPath</option></select>
+          <input id="sel-input" type="text" placeholder="Write your selector here…" autocomplete="off" spellcheck="false" />
+          <button id="sel-check" class="btn btn-primary btn-sm" data-magnetic>Check</button>
+          <button id="sel-skip" class="btn btn-ghost btn-sm" data-magnetic>Skip</button>
+        </div>
+        <div class="sel-result" id="sel-result">Match the highlighted nodes to score.</div>
+      </div>
+
+      <!-- FLAKY STORM -->
+      <div class="lab-panel" data-panel="flaky" role="tabpanel">
+        <div class="panel-head">
+          <div>
+            <h3>🎲 Flaky Storm</h3>
+            <p>Simulate a flaky test across N runs. Toggle smart-retry and watch pass rate stabilize.</p>
+          </div>
+          <div class="panel-stats">
+            <div><span>Passed</span><b id="flaky-pass">—</b></div>
+            <div><span>Failed</span><b id="flaky-fail">—</b></div>
+            <div><span>Retries</span><b id="flaky-rt">—</b></div>
+            <div><span>Pass rate</span><b id="flaky-pct">—</b></div>
+          </div>
+        </div>
         <div class="flaky-controls">
-          <label>Flakiness <input id="flaky-rate" type="range" min="0" max="100" value="20" /><span id="flaky-rate-v">20%</span></label>
-          <label>Runs <input id="flaky-runs" type="number" min="1" max="500" value="50" /></label>
+          <label>Flakiness <input id="flaky-rate" type="range" min="0" max="100" value="25" /><span id="flaky-rate-v">25%</span></label>
+          <label>Runs <input id="flaky-runs" type="number" min="4" max="500" value="80" /></label>
           <label class="check"><input id="flaky-retry" type="checkbox" /> Smart retry (×2)</label>
+          <button id="flaky-run" class="btn btn-primary btn-sm" data-magnetic>Run suite</button>
         </div>
-        <button id="flaky-run" class="btn btn-primary btn-sm">Run suite</button>
-        <div class="flaky-grid" id="flaky-grid" aria-label="Test run results"></div>
-        <div class="flaky-summary" id="flaky-summary">Pass rate: <b>—</b></div>
+        <canvas class="flaky-chart" id="flaky-chart" aria-label="Pass rate chart"></canvas>
+        <div class="flaky-grid" id="flaky-grid" aria-label="Run results"></div>
       </div>
 
-      <!-- Regex Asserter -->
-      <div class="lab-card">
-        <div class="lab-head">
-          <h3>🧬 Regex Asserter</h3>
-          <span class="lab-pill">live</span>
+      <!-- REGEX WIZARD -->
+      <div class="lab-panel" data-panel="regex" role="tabpanel">
+        <div class="panel-head">
+          <div>
+            <h3>🧬 Regex Wizard</h3>
+            <p>Solve <b>5 regex challenges</b> testers actually face — then free-play below.</p>
+          </div>
+          <div class="panel-stats">
+            <div><span>Challenge</span><b id="rx-step">1</b><span class="dim">/5</span></div>
+            <div><span>Score</span><b id="rx-score">0</b></div>
+            <div><span>Best</span><b id="rx-best">0</b></div>
+          </div>
         </div>
-        <p class="lab-desc">Test the regex you'd put in an assertion. Highlights matches as you type.</p>
+        <div class="rx-challenge" id="rx-challenge"></div>
         <div class="rx-controls">
           <span class="rx-slash">/</span>
-          <input id="rx-pattern" type="text" value="ORD-\d{4,}" />
+          <input id="rx-pattern" type="text" placeholder="pattern" autocomplete="off" spellcheck="false" />
           <span class="rx-slash">/</span>
-          <input id="rx-flags" type="text" value="gi" class="rx-flags" maxlength="6" />
+          <input id="rx-flags" type="text" value="g" class="rx-flags" maxlength="6" autocomplete="off" />
+          <button id="rx-check" class="btn btn-primary btn-sm" data-magnetic>Check</button>
         </div>
-        <textarea id="rx-text" rows="5">Order ORD-12345 was placed.
-Invoice ord-9981 is paid.
-Skip ORD-12 — too short.
-Confirmed ORD-7777771.</textarea>
-        <div class="rx-result" id="rx-result">0 matches</div>
+        <pre id="rx-preview" class="rx-preview"></pre>
+        <div class="rx-result" id="rx-result">Highlight all expected matches to clear the challenge.</div>
+      </div>
+
+      <!-- CI BUILDER -->
+      <div class="lab-panel" data-panel="ci" role="tabpanel">
+        <div class="panel-head">
+          <div>
+            <h3>⚡ CI Pipeline Builder</h3>
+            <p>Order the pipeline stages correctly. Click ▲▼ to arrange. Build → Test → Deploy 🚀</p>
+          </div>
+          <div class="panel-stats">
+            <div><span>Attempt</span><b id="ci-att">1</b></div>
+            <div><span>Best</span><b id="ci-best">—</b></div>
+          </div>
+        </div>
+        <ul class="ci-list" id="ci-list" aria-label="Pipeline stages"></ul>
+        <div class="panel-foot">
+          <button id="ci-check" class="btn btn-primary btn-sm" data-magnetic>Run pipeline ▶</button>
+          <button id="ci-shuffle" class="btn btn-ghost btn-sm" data-magnetic>Shuffle</button>
+          <span class="hint" id="ci-result">Click ▲▼ to reorder, then run the pipeline.</span>
+        </div>
+      </div>
+
+      <!-- SPOT THE BUG -->
+      <div class="lab-panel" data-panel="diff" role="tabpanel">
+        <div class="panel-head">
+          <div>
+            <h3>🔍 Spot the Bug</h3>
+            <p>Two UI mockups. One has subtle bugs. Click each difference. <b>4 to find</b>.</p>
+          </div>
+          <div class="panel-stats">
+            <div><span>Found</span><b id="diff-found">0</b><span class="dim">/4</span></div>
+            <div><span>Time</span><b id="diff-time">0</b><span class="dim">s</span></div>
+            <div><span>Best</span><b id="diff-best">—</b></div>
+          </div>
+        </div>
+        <div class="diff-stage">
+          <div class="diff-side" id="diff-good" data-side="good"></div>
+          <div class="diff-side" id="diff-bad" data-side="bad"></div>
+        </div>
+        <div class="panel-foot">
+          <button id="diff-start" class="btn btn-primary btn-sm" data-magnetic>New round</button>
+          <span class="hint">Click on the <b>buggy</b> side wherever you spot something off.</span>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- JOURNEY / TIMELINE -->
+<!-- JOURNEY -->
 <section id="journey" class="section section-alt">
   <div class="container">
     <div class="section-head">
-      <p class="eyebrow">04 / Journey</p>
-      <h2 class="section-title">From Selenium to AI agents</h2>
+      <p class="eyebrow"><span class="eyebrow-num">04</span> Journey</p>
+      <h2 class="section-title">From Selenium<br/><span class="serif">to AI agents.</span></h2>
     </div>
     <ol class="timeline">
       <li>
@@ -405,36 +464,44 @@ Confirmed ORD-7777771.</textarea>
   </div>
 </section>
 
-<!-- TESTIMONIAL / QUOTE STRIP -->
+<!-- QUOTE -->
 <section class="quote-strip">
   <div class="container">
+    <p class="quote-eyebrow">/ Belief</p>
     <blockquote>
-      "Quality isn't a stage in the pipeline — it's the pipeline."
+      <span class="serif">"Quality isn't a stage in the pipeline —<br/>it <em>is</em> the pipeline."</span>
     </blockquote>
-    <p class="q-author">— a thing I actually believe</p>
   </div>
 </section>
 
 <!-- CONTACT -->
 <section id="contact" class="section">
-  <div class="container contact">
-    <div>
-      <p class="eyebrow">05 / Contact</p>
-      <h2 class="section-title">Let's build something <span class="accent">unbreakable.</span></h2>
+  <div class="container">
+    <div class="section-head center">
+      <p class="eyebrow"><span class="eyebrow-num">05</span> Contact</p>
+      <h2 class="section-title">Let's build something<br/><span class="serif">unbreakable.</span></h2>
       <p class="section-lead">Open to QA Automation roles, framework builds, and AI-in-testing collaborations.</p>
     </div>
-    <div class="contact-cards">
-      <a href="mailto:rakesh.lella@gmail.com" class="c-card">
+    <div class="contact-grid">
+      <a href="mailto:rakesh.lella@gmail.com" class="c-card" data-magnetic>
         <span class="c-ic">✉️</span>
         <div><b>Email</b><p>rakesh.lella@gmail.com</p></div>
+        <span class="c-arrow">↗</span>
       </a>
-      <a href="tel:+918639137010" class="c-card">
+      <a href="tel:+918639137010" class="c-card" data-magnetic>
         <span class="c-ic">📱</span>
         <div><b>Phone</b><p>+91 86391 37010</p></div>
+        <span class="c-arrow">↗</span>
       </a>
-      <a href="assets/RakeshLella_Resume.pdf" download class="c-card">
+      <a href="assets/RakeshLella_Resume.pdf" download class="c-card" data-magnetic>
         <span class="c-ic">📄</span>
         <div><b>Resume</b><p>Download PDF</p></div>
+        <span class="c-arrow">↓</span>
+      </a>
+      <a href="https://github.com/Rakesh-lella" target="_blank" rel="noopener" class="c-card" data-magnetic>
+        <span class="c-ic">🐙</span>
+        <div><b>GitHub</b><p>@Rakesh-lella</p></div>
+        <span class="c-arrow">↗</span>
       </a>
     </div>
   </div>
@@ -442,8 +509,8 @@ Confirmed ORD-7777771.</textarea>
 
 <footer class="footer">
   <div class="container footer-inner">
-    <p>© <span id="year"></span> Rakesh L · Built &amp; tested by hand. <span class="mono">// no flaky tests were harmed</span></p>
-    <a href="#top" class="to-top">Back to top ↑</a>
+    <p>© <span id="year"></span> Rakesh L · Crafted with obsession &amp; coffee. <span class="mono">// no flaky tests were harmed</span></p>
+    <a href="#top" class="to-top" data-magnetic>Back to top ↑</a>
   </div>
 </footer>
 
