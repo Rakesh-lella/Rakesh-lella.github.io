@@ -280,7 +280,7 @@
         // QA ENV: catches plenty of regular bugs, but the hard-to-find ones slip past here
         { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 0.55, stealthP: 0.06, color: '#f97316' },
         // STAGE: where hard-to-find bugs get caught (stage-only reproductions) — kills almost all of them
-        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 0.85, stealthP: 0.92, color: '#a855f7' }
+        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 0.85, stealthP: 0.46, color: '#a855f7' }
       ];
       // devs at left edge (3 workstations) — each with a visible name tag
       const devY = [H * 0.22, H * 0.46, H * 0.70];
@@ -315,6 +315,14 @@
       }
     };
 
+    // Different categories of bugs QA actually finds in the field — used as a per-bug type tag
+    const BUG_TYPES = [
+      'RACE CONDITION', 'FLAKY TEST', 'EDGE CASE', 'REGRESSION',
+      'MEMORY LEAK',    'TIMEOUT',    'UI GLITCH', 'VALIDATION',
+      'AUTH BUG',       'INTEGRATION','BOUNDARY',  'NULL POINTER',
+      'PERF',           'CONCURRENCY','OFF-BY-ONE','LOCALE'
+    ];
+
     const spawnBug = () => {
       if (bugs.length >= MAX_BUGS) return;
       if (!devs.length) return;
@@ -339,7 +347,8 @@
         dieT: 0,
         passedGates: new Set(),
         targeted: false,
-        stealth: Math.random() < 0.45
+        stealth: Math.random() < 0.45,
+        bugType: BUG_TYPES[(Math.random() * BUG_TYPES.length) | 0]
       });
     };
 
@@ -945,15 +954,16 @@
             ctx.stroke();
             ctx.setLineDash([]);
             ctx.lineDashOffset = 0;
-            // floating "HARD-TO-FIND" tag above
+            // floating type tag above (each bug carries its own specific bug-type label)
+            const tagText = b.bugType || 'BUG';
             const tagX = b.x, tagY = b.y - b.size * 1.9 - 12;
             ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
-            const tw = ctx.measureText('◆ HARD-TO-FIND').width + 10;
+            const tw = ctx.measureText(tagText).width + 12;
             ctx.fillStyle = 'rgba(168, 85, 247, 0.95)';
             ctx.beginPath(); ctx.roundRect(tagX - tw / 2, tagY - 8, tw, 12, 3); ctx.fill();
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
-            ctx.fillText('◆ HARD-TO-FIND', tagX, tagY + 1);
+            ctx.fillText(tagText, tagX, tagY + 1);
             ctx.textAlign = 'start';
             // pointer triangle
             ctx.fillStyle = 'rgba(168, 85, 247, 0.95)';
@@ -1075,7 +1085,7 @@
       const segs = [
         [`⚙ devs: ${devKills}`,                  'rgba(125, 211, 252, 0.95)'],
         [`● QA: ${qaKills}`,                     'rgba(74, 222, 128, 0.95)'],
-        [`◆ stage-caught (hard-to-find): ${stealthKills}`, 'rgba(196, 181, 253, 0.95)'],
+        [`◆ stage-caught: ${stealthKills}`, 'rgba(196, 181, 253, 0.95)'],
         [`✖ leaked: ${leakCount}`,               `rgba(252, 165, 165, ${leakCount > 0 ? 0.95 : 0.7})`]
       ];
       // measure
@@ -2469,13 +2479,13 @@
     { key: 'ci',     label: 'CI / CD',    caption: 'pipeline',    color: '#f5a623', icon: '⚙' },
     { key: 'tests',  label: 'Tests',      caption: '120/120',     color: '#18a957', icon: '✓' },
     { key: 'deploy', label: 'Deploy',     caption: 'rollout',     color: '#ff5a36', icon: '↗' },
-    { key: 'prod',   label: 'Production', caption: '99.99% live', color: '#0a6f3a', icon: '☁' }
+    { key: 'prod',   label: 'Prod',       caption: 'live',        color: '#0a6f3a', icon: '☁' }
   ];
 
   let packet = { i: 0, t: 0, phase: 'travel', dwellStart: 0, restartAt: 0 };
   let lastT = 0;
-  const PACKET_SPEED = 0.42;
-  const DWELL = 1700;       // ms per station — stay long enough for the mini body anim to finish
+  const PACKET_SPEED = 0.35;
+  const DWELL = 2400;       // ms per station — long enough for the body animation to fully complete before transition
   const PAUSE_AFTER_LOOP = 1600;
 
   const SAFE_LEFT_DUP_REMOVED = (() => {
@@ -2906,28 +2916,30 @@
 
   // continuous flowing transition dots between every consecutive station
   const drawFlowDots = (now) => {
+    // Strictly sequential: only the segment the packet is currently traveling on
+    // shows flowing dots. While a station is dwelling, all transitions are quiet —
+    // so the user clearly sees "QA writes finishes -> then black transition -> git push".
+    if (packet.phase !== 'travel') return;
+    const i = packet.i;
+    if (i >= STAGES.length - 1) return;
     const DOTS_PER_SEG = 3;
-    const SEG_MS = 1400;            // time for one dot to traverse a segment
+    const SEG_MS = 1400;
     ctx.save();
-    for (let i = 0; i < STAGES.length - 1; i++) {
-      const col = STAGES[i + 1].color;
-      const isActive = (packet.phase === 'travel' && packet.i === i);
-      const a = stationFor(i);
-      const b = stationFor(i + 1);
-      // jumps need a slower dot speed because the path is longer
-      const segMs = (a.row === b.row) ? SEG_MS : SEG_MS * 1.7;
-      for (let k = 0; k < DOTS_PER_SEG; k++) {
-        const phase = ((now / segMs) + k / DOTS_PER_SEG) % 1;
-        const p = segmentPoint(i, phase);
-        const fade = Math.sin(phase * Math.PI);
-        ctx.globalAlpha = (isActive ? 0.55 : 0.28) * fade;
-        ctx.shadowColor = col;
-        ctx.shadowBlur = isActive ? 10 : 4;
-        ctx.fillStyle = col;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, isActive ? 3.2 : 2.4, 0, Math.PI * 2);
-        ctx.fill();
-      }
+    const col = STAGES[i + 1].color;
+    const a = stationFor(i);
+    const b = stationFor(i + 1);
+    const segMs = (a.row === b.row) ? SEG_MS : SEG_MS * 1.7;
+    for (let k = 0; k < DOTS_PER_SEG; k++) {
+      const phase = ((now / segMs) + k / DOTS_PER_SEG) % 1;
+      const p = segmentPoint(i, phase);
+      const fade = Math.sin(phase * Math.PI);
+      ctx.globalAlpha = 0.6 * fade;
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;
