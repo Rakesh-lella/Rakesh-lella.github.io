@@ -159,6 +159,10 @@ body.loading { overflow: hidden; }
 #stack { overflow: hidden; padding-top: clamp(180px, 20vh, 240px); position: relative; }
 #stack .container { position: relative; z-index: 1; }
 #stack .section-head { margin-top: 24px; }
+.journey-canvas { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 1; }
+#journey { overflow: hidden; padding-top: clamp(240px, 26vh, 300px); position: relative; }
+#journey .container { position: relative; z-index: 1; }
+#journey .section-head { margin-top: 24px; }
 .bg-noise {
   position: fixed; inset: 0; z-index: 1;
   pointer-events: none;

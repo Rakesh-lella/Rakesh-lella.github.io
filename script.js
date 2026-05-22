@@ -3371,3 +3371,489 @@
   };
   requestAnimationFrame(tick);
 })();
+
+/* =========================================================
+   JOURNEY SECTION BACKGROUND — Locust load-test dashboard
+   Live ramp-up of users, RPS line chart climbing, per-endpoint
+   request bars, failure counts. Cycles: idle → spawn → load
+   → cooldown → reset.
+   ========================================================= */
+(() => {
+  const c = document.getElementById('journey-canvas');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  let dpr = 1, W = 0, H = 0;
+
+  const resize = () => {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    const r = c.getBoundingClientRect();
+    W = Math.max(360, r.width);
+    H = Math.max(280, r.height);
+    c.width = W * dpr; c.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(c);
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---- helpers ----
+  const roundRect = (x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+
+  // ---- config / state ----
+  const MAX_USERS = 100;
+  const ENDPOINTS = [
+    { method: 'GET',  path: '/api/users',    color: '#18a957', weight: 0.45 },
+    { method: 'POST', path: '/api/login',    color: '#6d3df1', weight: 0.30 },
+    { method: 'GET',  path: '/api/products', color: '#0ea5e9', weight: 0.25 }
+  ];
+
+  const PHASES = [
+    { name: 'idle',     dur: 1100 },
+    { name: 'spawn',    dur: 3000 },
+    { name: 'load',     dur: 6000 },
+    { name: 'cooldown', dur: 1600 },
+    { name: 'reset',    dur: 600  }
+  ];
+
+  let st = { pi: 0, t0: 0 };
+  let lastT = 0;
+
+  // rps history — captured during load phase, shown growing
+  const RPS_POINTS = 60; // sample count for chart
+  let rpsBuf = new Array(RPS_POINTS).fill(0);
+  let rpsHead = 0;
+
+  // accumulators
+  let totalRequests = 0;
+  let totalFailures = 0;
+  const epStats = ENDPOINTS.map(() => ({ req: 0, fail: 0, avgMs: 0, p95Ms: 0 }));
+
+  // user dots — random positions in left grid box
+  const USER_DOTS = [];
+  for (let i = 0; i < MAX_USERS; i++) {
+    USER_DOTS.push({
+      rx: Math.random(),
+      ry: Math.random(),
+      jitterPhase: Math.random() * Math.PI * 2,
+      jitterSpeed: 0.6 + Math.random() * 0.9
+    });
+  }
+
+  const advance = (now) => {
+    const p = PHASES[st.pi];
+    if (now - st.t0 < p.dur) return;
+    st.pi = (st.pi + 1) % PHASES.length;
+    st.t0 = now;
+    if (st.pi === 0 || st.pi === 4) {
+      // reset accumulators on reset/idle
+      rpsBuf = new Array(RPS_POINTS).fill(0);
+      rpsHead = 0;
+      totalRequests = 0;
+      totalFailures = 0;
+      for (const s of epStats) { s.req = 0; s.fail = 0; s.avgMs = 0; s.p95Ms = 0; }
+    }
+  };
+
+  const phase = () => PHASES[st.pi].name;
+  const phaseProg = (now) => {
+    const p = PHASES[st.pi];
+    return Math.max(0, Math.min(1, (now - st.t0) / p.dur));
+  };
+
+  // current user count based on phase
+  const userCount = (now) => {
+    const ph = phase();
+    if (ph === 'idle' || ph === 'reset') return 0;
+    if (ph === 'spawn') return Math.floor(MAX_USERS * phaseProg(now));
+    return MAX_USERS; // load / cooldown
+  };
+
+  // target rps based on phase (slight oscillation for liveliness)
+  const targetRps = (now) => {
+    const ph = phase();
+    if (ph === 'idle' || ph === 'reset' || ph === 'spawn') {
+      if (ph === 'spawn') {
+        // small ramp during spawn
+        return Math.floor(40 * phaseProg(now));
+      }
+      return 0;
+    }
+    if (ph === 'load') {
+      const p = phaseProg(now);
+      // climb to ~520 with subtle wobble
+      const base = 60 + Math.pow(p, 0.8) * 460;
+      const wob = Math.sin(now / 250) * 18 + Math.sin(now / 410) * 9;
+      return Math.max(0, Math.round(base + wob));
+    }
+    if (ph === 'cooldown') {
+      const p = 1 - phaseProg(now);
+      return Math.max(0, Math.round(520 * p * 0.7));
+    }
+    return 0;
+  };
+
+  // ---- layout ----
+  const layout = () => {
+    const SAFE = Math.max(20, W * 0.06);
+    const top = 18;
+    const totalW = W - SAFE * 2;
+    const headerH = 38;
+    const panelH = 168;
+
+    // header bar
+    const header = { x: SAFE, y: top, w: totalW, h: headerH };
+
+    // panels
+    const py = top + headerH + 10;
+    const gap = 12;
+    // left users (28%), middle chart (44%), right stats (28%)
+    const wL = Math.round(totalW * 0.28);
+    const wR = Math.round(totalW * 0.28);
+    const wM = totalW - wL - wR - gap * 2;
+    return {
+      header,
+      L: { x: SAFE,                       y: py, w: wL, h: panelH },
+      M: { x: SAFE + wL + gap,            y: py, w: wM, h: panelH },
+      R: { x: SAFE + wL + gap + wM + gap, y: py, w: wR, h: panelH }
+    };
+  };
+
+  // ---- header bar ----
+  const drawHeader = (now, h) => {
+    // dark bar
+    ctx.save();
+    ctx.shadowColor = 'rgba(10,10,12,0.12)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = '#0f1115';
+    roundRect(h.x, h.y, h.w, h.h, 10);
+    ctx.fill();
+    ctx.restore();
+
+    // locust brand
+    ctx.fillStyle = '#16c47b';
+    ctx.font = '900 12px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🦗 locust', h.x + 14, h.y + h.h / 2);
+    ctx.fillStyle = 'rgba(230,227,218,0.45)';
+    ctx.font = '600 10px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText(' / load test · users-api', h.x + 78, h.y + h.h / 2);
+
+    // status pill
+    const ph = phase();
+    const pulse = (ph === 'load' || ph === 'spawn');
+    const labelMap = { idle: 'READY', spawn: 'SPAWNING', load: 'RUNNING', cooldown: 'STOPPING', reset: 'RESET' };
+    const colorMap = { idle: '#475569', spawn: '#f59e0b', load: '#18a957', cooldown: '#f59e0b', reset: '#475569' };
+    // Right-aligned cluster: [users  spawn]  [PILL]
+    const pillW = 96;
+    const pillY = h.y + (h.h - 22) / 2;
+    const pillX = h.x + h.w - 14 - pillW;
+    if (pulse) {
+      ctx.shadowColor = colorMap[ph];
+      ctx.shadowBlur = 14;
+    }
+    ctx.fillStyle = colorMap[ph];
+    roundRect(pillX, pillY, pillW, 22, 4);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // pulsing dot inside pill
+    if (pulse) {
+      const a = 0.55 + 0.45 * Math.sin(now / 220);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(pillX + 12, pillY + 11, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(labelMap[ph], pillX + pillW / 2 + 6, pillY + 11);
+
+    // users + spawn text to the left of the pill
+    const u = userCount(now);
+    ctx.fillStyle = 'rgba(230,227,218,0.85)';
+    ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`users ${u}/${MAX_USERS}`, pillX - 14, h.y + h.h / 2);
+    const uW = ctx.measureText(`users ${u}/${MAX_USERS}`).width;
+    ctx.fillStyle = 'rgba(230,227,218,0.55)';
+    ctx.font = '600 10px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText('· spawn 10/s', pillX - 14 - uW - 6, h.y + h.h / 2);
+  };
+
+  // ---- left panel: users grid + big count ----
+  const drawUsersPanel = (now, r) => {
+    panelChrome(r, 'USERS', '#16c47b');
+    const u = userCount(now);
+    const p = phaseProg(now);
+    // huge number
+    ctx.fillStyle = '#1d1d22';
+    ctx.font = '900 36px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(String(u), r.x + 14, r.y + 30);
+    ctx.fillStyle = 'rgba(10,10,12,0.45)';
+    ctx.font = '600 10px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText(`/ ${MAX_USERS} target`, r.x + 14, r.y + 70);
+
+    // ramp progress bar
+    const barX = r.x + 14;
+    const barY = r.y + 90;
+    const barW = r.w - 28;
+    ctx.fillStyle = 'rgba(10,10,12,0.06)';
+    roundRect(barX, barY, barW, 4, 2);
+    ctx.fill();
+    const ratio = u / MAX_USERS;
+    if (ratio > 0) {
+      const g = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+      g.addColorStop(0, '#16c47b');
+      g.addColorStop(1, '#0a9c5e');
+      ctx.fillStyle = g;
+      roundRect(barX, barY, barW * ratio, 4, 2);
+      ctx.fill();
+    }
+
+    // dots grid (10x10 = 100 spots)
+    const gridX = r.x + 14;
+    const gridY = r.y + 104;
+    const gridW = r.w - 28;
+    const gridH = r.h - (gridY - r.y) - 10;
+    const cols = 10, rows = 10;
+    const cw = gridW / cols;
+    const ch = gridH / rows;
+    for (let i = 0; i < MAX_USERS; i++) {
+      const dot = USER_DOTS[i];
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const cx = gridX + col * cw + cw / 2;
+      const cy = gridY + row * ch + ch / 2;
+      const active = i < u;
+      if (active) {
+        // jittering hue for "running" feel
+        const jx = Math.sin(now / 600 * dot.jitterSpeed + dot.jitterPhase) * 0.6;
+        const jy = Math.cos(now / 600 * dot.jitterSpeed + dot.jitterPhase) * 0.6;
+        ctx.fillStyle = '#16c47b';
+        ctx.beginPath();
+        ctx.arc(cx + jx, cy + jy, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = 'rgba(10,10,12,0.10)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  };
+
+  // ---- middle panel: RPS line chart ----
+  const drawChartPanel = (now, r) => {
+    panelChrome(r, 'REQUESTS / SEC', '#0ea5e9');
+
+    // push current rps into buffer at sample interval (every ~80ms)
+    const sample = targetRps(now);
+    if (!drawChartPanel.lastSample || now - drawChartPanel.lastSample > 80) {
+      rpsBuf[rpsHead] = sample;
+      rpsHead = (rpsHead + 1) % RPS_POINTS;
+      drawChartPanel.lastSample = now;
+      // accumulate per-endpoint stats
+      const dt = 0.08;
+      const inc = sample * dt;
+      totalRequests += inc;
+      for (let i = 0; i < ENDPOINTS.length; i++) {
+        const e = ENDPOINTS[i];
+        const subInc = inc * e.weight;
+        epStats[i].req += subInc;
+        // small fail rate, varies per endpoint
+        const failRate = (i === 1) ? 0.012 : 0.004;
+        const failInc = subInc * failRate;
+        epStats[i].fail += failInc;
+        totalFailures += failInc;
+        // running latency-like avg
+        const targetAvg = 40 + i * 22 + (phase() === 'load' ? Math.min(40, sample / 12) : 0);
+        epStats[i].avgMs += (targetAvg - epStats[i].avgMs) * 0.18;
+        epStats[i].p95Ms += (targetAvg * 2.2 - epStats[i].p95Ms) * 0.18;
+      }
+    }
+
+    // chart area
+    const cx0 = r.x + 14;
+    const cy0 = r.y + 36;
+    const cw  = r.w - 28;
+    const ch  = r.h - (cy0 - r.y) - 16;
+
+    // background gridlines
+    ctx.strokeStyle = 'rgba(10,10,12,0.06)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const yy = cy0 + (ch / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(cx0, yy);
+      ctx.lineTo(cx0 + cw, yy);
+      ctx.stroke();
+    }
+    // y axis labels
+    ctx.fillStyle = 'rgba(10,10,12,0.40)';
+    ctx.font = '600 8px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const maxRps = 600;
+    for (let i = 0; i <= 4; i++) {
+      ctx.fillText(String(maxRps - (maxRps / 4) * i), cx0 + 2, cy0 + (ch / 4) * i);
+    }
+
+    // line path
+    ctx.beginPath();
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = '#0ea5e9';
+    for (let i = 0; i < RPS_POINTS; i++) {
+      const idx = (rpsHead + i) % RPS_POINTS;
+      const v = rpsBuf[idx];
+      const xx = cx0 + (i / (RPS_POINTS - 1)) * cw;
+      const yy = cy0 + ch - (v / maxRps) * ch;
+      if (i === 0) ctx.moveTo(xx, yy);
+      else ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+
+    // area fill below
+    ctx.lineTo(cx0 + cw, cy0 + ch);
+    ctx.lineTo(cx0, cy0 + ch);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, cy0, 0, cy0 + ch);
+    g.addColorStop(0, 'rgba(14,165,233,0.30)');
+    g.addColorStop(1, 'rgba(14,165,233,0.00)');
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // current value label (top right, big)
+    const curr = Math.round(sample);
+    ctx.fillStyle = '#0ea5e9';
+    ctx.font = '900 18px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${curr}`, r.x + r.w - 16, r.y + 30);
+    ctx.fillStyle = 'rgba(10,10,12,0.45)';
+    ctx.font = '600 9px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText('rps', r.x + r.w - 16, r.y + 52);
+
+    // moving cursor dot at last point
+    if (curr > 0) {
+      const lastIdx = (rpsHead - 1 + RPS_POINTS) % RPS_POINTS;
+      const xx = cx0 + cw;
+      const yy = cy0 + ch - (rpsBuf[lastIdx] / maxRps) * ch;
+      ctx.shadowColor = '#0ea5e9';
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#0ea5e9';
+      ctx.beginPath();
+      ctx.arc(xx, yy, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  };
+
+  // ---- right panel: live metrics ----
+  const drawMetricsPanel = (now, r) => {
+    panelChrome(r, 'METRICS', '#6d3df1');
+    const rows = [
+      { label: 'TOTAL', value: formatNum(Math.round(totalRequests)), color: '#1d1d22' },
+      { label: 'FAILS', value: `${Math.round(totalFailures)}` +
+        (totalRequests > 0 ? `  ${(totalFailures / totalRequests * 100).toFixed(2)}%` : ''),
+        color: totalFailures > 0 ? '#ef4444' : '#0a6f3a' },
+      { label: 'AVG ms', value: epStats[0].avgMs ? Math.round(avg(epStats.map(s => s.avgMs))) + ' ms' : '— ms', color: '#1d1d22' },
+      { label: 'P95 ms', value: epStats[0].p95Ms ? Math.round(avg(epStats.map(s => s.p95Ms))) + ' ms' : '— ms', color: '#f59e0b' }
+    ];
+    const rowH = (r.h - 38) / rows.length;
+    for (let i = 0; i < rows.length; i++) {
+      const yy = r.y + 30 + i * rowH;
+      // label
+      ctx.fillStyle = 'rgba(10,10,12,0.45)';
+      ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(rows[i].label, r.x + 14, yy + rowH / 2);
+      // value
+      ctx.fillStyle = rows[i].color;
+      ctx.font = '900 14px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(rows[i].value, r.x + r.w - 14, yy + rowH / 2);
+      // divider
+      if (i < rows.length - 1) {
+        ctx.strokeStyle = 'rgba(10,10,12,0.06)';
+        ctx.beginPath();
+        ctx.moveTo(r.x + 12, yy + rowH);
+        ctx.lineTo(r.x + r.w - 12, yy + rowH);
+        ctx.stroke();
+      }
+    }
+  };
+
+  // panel chrome (shared with the other dashboards)
+  const panelChrome = (r, label, accent) => {
+    ctx.save();
+    ctx.shadowColor = 'rgba(10,10,12,0.10)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 5;
+    ctx.fillStyle = '#ffffff';
+    roundRect(r.x, r.y, r.w, r.h, 12);
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(10,10,12,0.08)';
+    ctx.lineWidth = 1;
+    roundRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1, 12);
+    ctx.stroke();
+    // header strip
+    ctx.fillStyle = 'rgba(10,10,12,0.04)';
+    roundRect(r.x, r.y, r.w, 22, 12);
+    ctx.fill();
+    ctx.fillRect(r.x, r.y + 14, r.w, 8);
+    // accent dot
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(r.x + 12, r.y + 11, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // label
+    ctx.fillStyle = 'rgba(10,10,12,0.70)';
+    ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, r.x + 22, r.y + 11);
+  };
+
+  // ---- helpers ----
+  function avg(a) { return a.reduce((s, v) => s + v, 0) / a.length; }
+  function formatNum(n) {
+    if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 1 : 2) + 'k';
+    return String(n);
+  }
+
+  const tick = (now) => {
+    if (!lastT) { lastT = now; st.t0 = now; }
+    lastT = now;
+    advance(now);
+
+    ctx.clearRect(0, 0, W, H);
+    const lay = layout();
+
+    drawHeader(now, lay.header);
+    drawUsersPanel(now, lay.L);
+    drawChartPanel(now, lay.M);
+    drawMetricsPanel(now, lay.R);
+
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})();
+
