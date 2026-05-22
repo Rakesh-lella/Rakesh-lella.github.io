@@ -213,65 +213,188 @@
     });
   })();
 
-  // ===== particle constellation canvas =====
+  // ===== interactive background field (flagship) =====
+  // Dot grid with cursor repulsion + spring return, magnetic chord beams,
+  // and a fading ink trail that follows the pointer.
   (() => {
     const c = $('#bg-canvas');
     if (!c || prefersReduced) return;
     const ctx = c.getContext('2d');
-    let w, h, dpr, parts;
-    const COUNT = Math.min(70, Math.floor(innerWidth / 22));
+    let w, h, dpr;
+    let dots = [];
+    const trail = [];          // ink trail points {x,y,t}
+    const TRAIL_MAX = 28;
+    const SPACING = 56;        // grid spacing (CSS px)
+    const REPEL_R = 140;       // repulsion radius (CSS px)
+    const REPEL_STRENGTH = 38; // max displacement (CSS px)
+    const BEAM_R = 180;        // chord beam radius
+    const SPRING = 0.085;      // pull back toward base
+    const DAMP   = 0.78;       // velocity damping
+
+    let mx = -9999, my = -9999;     // cursor (CSS px)
+    let mLast = { x: -9999, y: -9999, t: 0 };
+    let pressing = false;
+    let pressT = 0;            // ripple seed in CSS px radius
+
     const resize = () => {
       dpr = Math.min(2, window.devicePixelRatio || 1);
-      w = c.width = innerWidth * dpr; h = c.height = innerHeight * dpr;
-      c.style.width = innerWidth + 'px'; c.style.height = innerHeight + 'px';
+      const W = innerWidth, H = innerHeight;
+      c.width = W * dpr; c.height = H * dpr;
+      c.style.width = W + 'px'; c.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      w = W; h = H;
+      // build grid
+      dots = [];
+      const cols = Math.ceil(W / SPACING) + 1;
+      const rows = Math.ceil(H / SPACING) + 1;
+      const offX = (W - (cols - 1) * SPACING) / 2;
+      const offY = (H - (rows - 1) * SPACING) / 2;
+      for (let r = 0; r < rows; r++) {
+        for (let cc = 0; cc < cols; cc++) {
+          const bx = offX + cc * SPACING;
+          const by = offY + r * SPACING;
+          dots.push({ bx, by, x: bx, y: by, vx: 0, vy: 0, hi: 0 });
+        }
+      }
     };
-    const init = () => {
-      parts = Array.from({ length: COUNT }, () => ({
-        x: Math.random() * w, y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.18 * dpr,
-        vy: (Math.random() - 0.5) * 0.18 * dpr,
-        r: (Math.random() * 1.2 + 0.6) * dpr
-      }));
+
+    const onMove = (e) => {
+      mx = e.clientX; my = e.clientY;
+      const now = performance.now();
+      // throttle trail to ~60fps
+      if (now - mLast.t > 14) {
+        trail.push({ x: mx, y: my, t: now });
+        if (trail.length > TRAIL_MAX) trail.shift();
+        mLast = { x: mx, y: my, t: now };
+      }
     };
-    // ink dots on white background
-    const dotCol = 'rgba(10,10,12,1)';
-    const lineCol = 'rgba(10,10,12,1)';
-    let mx2 = -9999, my2 = -9999;
-    window.addEventListener('mousemove', e => { mx2 = e.clientX * dpr; my2 = e.clientY * dpr; }, { passive: true });
+    window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('pointerdown', e => { pressing = true; pressT = 0; mx = e.clientX; my = e.clientY; });
+    window.addEventListener('pointerup', () => { pressing = false; });
+    window.addEventListener('pointerleave', () => { mx = -9999; my = -9999; });
+
+    // accent color, light-mode tuned
+    const inkRGB    = '10, 10, 12';
+    const accentRGB = '24, 169, 87';
+
     const tick = () => {
       ctx.clearRect(0, 0, w, h);
-      for (const p of parts) {
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < 0 || p.x > w) p.vx *= -1;
-        if (p.y < 0 || p.y > h) p.vy *= -1;
-        ctx.beginPath(); ctx.fillStyle = dotCol; ctx.globalAlpha = .28;
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+
+      // ---- click ripple expanding force ring ----
+      let rippleR = 0;
+      if (pressing) {
+        pressT += 18;
+        rippleR = pressT;
+        if (rippleR > 260) { pressing = false; }
       }
-      ctx.lineWidth = 1 * dpr;
-      for (let i = 0; i < parts.length; i++) {
-        for (let j = i + 1; j < parts.length; j++) {
-          const a = parts[i], b = parts[j];
-          const dx = a.x - b.x, dy = a.y - b.y, d = dx * dx + dy * dy;
-          const max = 130 * dpr * 130 * dpr;
-          if (d < max) {
-            ctx.globalAlpha = (1 - d / max) * 0.12;
-            ctx.strokeStyle = lineCol;
-            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+
+      // ---- update dots ----
+      const R2 = REPEL_R * REPEL_R;
+      for (let i = 0; i < dots.length; i++) {
+        const d = dots[i];
+        // spring back to base
+        const sx = (d.bx - d.x) * SPRING;
+        const sy = (d.by - d.y) * SPRING;
+        d.vx = (d.vx + sx) * DAMP;
+        d.vy = (d.vy + sy) * DAMP;
+
+        // repulsion from cursor
+        const dx = d.x - mx, dy = d.y - my;
+        const dd = dx * dx + dy * dy;
+        if (dd < R2 && dd > 0.01) {
+          const dist = Math.sqrt(dd);
+          const f = (1 - dist / REPEL_R);
+          const push = f * f * REPEL_STRENGTH * 0.18;
+          d.vx += (dx / dist) * push;
+          d.vy += (dy / dist) * push;
+          d.hi = Math.max(d.hi, f);
+        } else {
+          d.hi *= 0.92;
+        }
+
+        // click ripple impulse
+        if (pressing && rippleR > 0) {
+          const rdx = d.x - mx, rdy = d.y - my;
+          const rdist = Math.sqrt(rdx * rdx + rdy * rdy);
+          const band = Math.abs(rdist - rippleR);
+          if (band < 30) {
+            const force = (1 - band / 30) * 1.4;
+            d.vx += (rdx / (rdist || 1)) * force;
+            d.vy += (rdy / (rdist || 1)) * force;
+            d.hi = Math.max(d.hi, .8);
           }
         }
-        const dxm = parts[i].x - mx2, dym = parts[i].y - my2, dm = dxm * dxm + dym * dym;
-        const maxM = 180 * dpr * 180 * dpr;
-        if (dm < maxM) {
-          ctx.globalAlpha = (1 - dm / maxM) * 0.22;
-          ctx.strokeStyle = 'rgba(24,169,87,1)';
-          ctx.beginPath(); ctx.moveTo(parts[i].x, parts[i].y); ctx.lineTo(mx2, my2); ctx.stroke();
+
+        d.x += d.vx;
+        d.y += d.vy;
+      }
+
+      // ---- draw ink trail (cursor) ----
+      if (trail.length > 1) {
+        for (let i = 1; i < trail.length; i++) {
+          const a = trail[i - 1], b = trail[i];
+          const k = i / trail.length;
+          ctx.strokeStyle = `rgba(${accentRGB}, ${0.06 + k * 0.18})`;
+          ctx.lineWidth = 0.5 + k * 1.8;
+          ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+        // age out
+        const now = performance.now();
+        while (trail.length && now - trail[0].t > 420) trail.shift();
+      }
+
+      // ---- draw chord beams from cursor to nearest dots within BEAM_R ----
+      const B2 = BEAM_R * BEAM_R;
+      if (mx > -9000) {
+        for (let i = 0; i < dots.length; i++) {
+          const d = dots[i];
+          const dx = d.x - mx, dy = d.y - my;
+          const dd = dx * dx + dy * dy;
+          if (dd < B2) {
+            const k = 1 - Math.sqrt(dd) / BEAM_R;
+            ctx.strokeStyle = `rgba(${accentRGB}, ${k * 0.32})`;
+            ctx.lineWidth = 0.4 + k * 1.2;
+            ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(d.x, d.y); ctx.stroke();
+          }
         }
       }
-      ctx.globalAlpha = 1;
+
+      // ---- draw dots ----
+      for (let i = 0; i < dots.length; i++) {
+        const d = dots[i];
+        // base dot
+        const baseA = 0.10;
+        const r = 1.1 + d.hi * 2.4;
+        ctx.beginPath();
+        // color blends ink → accent as hi rises
+        const ar = baseA + d.hi * 0.6;
+        if (d.hi > 0.06) {
+          ctx.fillStyle = `rgba(${accentRGB}, ${ar})`;
+        } else {
+          ctx.fillStyle = `rgba(${inkRGB}, ${ar})`;
+        }
+        ctx.arc(d.x, d.y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // ---- soft halo around cursor ----
+      if (mx > -9000) {
+        const g = ctx.createRadialGradient(mx, my, 0, mx, my, 220);
+        g.addColorStop(0, `rgba(${accentRGB}, 0.10)`);
+        g.addColorStop(0.5, `rgba(${accentRGB}, 0.04)`);
+        g.addColorStop(1, `rgba(${accentRGB}, 0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(mx, my, 220, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       requestAnimationFrame(tick);
     };
-    resize(); init();
-    window.addEventListener('resize', () => { resize(); init(); });
+
+    resize();
+    window.addEventListener('resize', resize);
     tick();
   })();
 
