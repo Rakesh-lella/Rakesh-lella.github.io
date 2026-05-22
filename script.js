@@ -213,28 +213,32 @@
     });
   })();
 
-  // ===== interactive background field (flagship) =====
-  // Dot grid with cursor repulsion + spring return, magnetic chord beams,
-  // and a fading ink trail that follows the pointer.
+  // ===== Live Test Matrix (flagship, QA-themed background) =====
+  // A grid of "test cells" that execute under your cursor:
+  //   idle ─► running ─► passed (✓)   with rare failed (✗) that auto-heals.
+  // Click sweeps a batch assertion through the grid (green ripple).
+  // The cursor leaves a faint code-trace line.
   (() => {
     const c = $('#bg-canvas');
     if (!c || prefersReduced) return;
     const ctx = c.getContext('2d');
     let w, h, dpr;
-    let dots = [];
-    const trail = [];          // ink trail points {x,y,t}
-    const TRAIL_MAX = 28;
-    const SPACING = 56;        // grid spacing (CSS px)
-    const REPEL_R = 140;       // repulsion radius (CSS px)
-    const REPEL_STRENGTH = 38; // max displacement (CSS px)
-    const BEAM_R = 180;        // chord beam radius
-    const SPRING = 0.085;      // pull back toward base
-    const DAMP   = 0.78;       // velocity damping
+    let cells = [];
+    const trail = [];                  // pointer trace points
+    const TRAIL_MAX = 22;
+    const SPACING   = 46;              // grid spacing (CSS px)
+    const RUN_R     = 130;             // exec radius around cursor
+    const PASS_FADE = 2200;            // ms a passed cell stays bright
+    const RUN_MS    = 280;             // ms in "running" state before pass
 
-    let mx = -9999, my = -9999;     // cursor (CSS px)
-    let mLast = { x: -9999, y: -9999, t: 0 };
-    let pressing = false;
-    let pressT = 0;            // ripple seed in CSS px radius
+    let mx = -9999, my = -9999;
+    let mLast = { x: 0, y: 0, t: 0 };
+    let ripple = null;                 // {x,y,r,t0}
+    const ripples = [];
+
+    const accentRGB = '24, 169, 87';   // emerald (pass)
+    const failRGB   = '255, 90, 54';   // coral  (fail)
+    const inkRGB    = '10, 10, 12';
 
     const resize = () => {
       dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -243,17 +247,20 @@
       c.style.width = W + 'px'; c.style.height = H + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       w = W; h = H;
-      // build grid
-      dots = [];
+      cells = [];
       const cols = Math.ceil(W / SPACING) + 1;
       const rows = Math.ceil(H / SPACING) + 1;
       const offX = (W - (cols - 1) * SPACING) / 2;
       const offY = (H - (rows - 1) * SPACING) / 2;
       for (let r = 0; r < rows; r++) {
         for (let cc = 0; cc < cols; cc++) {
-          const bx = offX + cc * SPACING;
-          const by = offY + r * SPACING;
-          dots.push({ bx, by, x: bx, y: by, vx: 0, vy: 0, hi: 0 });
+          cells.push({
+            x: offX + cc * SPACING,
+            y: offY + r * SPACING,
+            state: 'idle',    // idle | running | passed | failed
+            t: 0,             // state-entered timestamp
+            seed: Math.random()
+          });
         }
       }
     };
@@ -261,133 +268,172 @@
     const onMove = (e) => {
       mx = e.clientX; my = e.clientY;
       const now = performance.now();
-      // throttle trail to ~60fps
-      if (now - mLast.t > 14) {
+      if (now - mLast.t > 16) {
         trail.push({ x: mx, y: my, t: now });
         if (trail.length > TRAIL_MAX) trail.shift();
         mLast = { x: mx, y: my, t: now };
       }
     };
     window.addEventListener('pointermove', onMove, { passive: true });
-    window.addEventListener('pointerdown', e => { pressing = true; pressT = 0; mx = e.clientX; my = e.clientY; });
-    window.addEventListener('pointerup', () => { pressing = false; });
+    window.addEventListener('pointerdown', e => {
+      ripples.push({ x: e.clientX, y: e.clientY, t0: performance.now() });
+      if (ripples.length > 3) ripples.shift();
+    });
     window.addEventListener('pointerleave', () => { mx = -9999; my = -9999; });
 
-    // accent color, light-mode tuned
-    const inkRGB    = '10, 10, 12';
-    const accentRGB = '24, 169, 87';
+    // schedule rare bug events (failed cell that auto-heals)
+    const scheduleBug = () => {
+      const delay = 3500 + Math.random() * 5000;
+      setTimeout(() => {
+        if (cells.length) {
+          // pick an idle cell far from cursor
+          for (let tries = 0; tries < 12; tries++) {
+            const cell = cells[(Math.random() * cells.length) | 0];
+            const dx = cell.x - mx, dy = cell.y - my;
+            if (dx*dx + dy*dy > 260*260 && cell.state === 'idle') {
+              cell.state = 'failed'; cell.t = performance.now();
+              break;
+            }
+          }
+        }
+        scheduleBug();
+      }, delay);
+    };
+    scheduleBug();
+
+    // draw a tiny check ✓
+    const drawCheck = (x, y, s, alpha) => {
+      ctx.strokeStyle = `rgba(${accentRGB}, ${alpha})`;
+      ctx.lineWidth = 1.3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x - s, y);
+      ctx.lineTo(x - s * 0.25, y + s * 0.75);
+      ctx.lineTo(x + s, y - s * 0.65);
+      ctx.stroke();
+    };
+    // draw a tiny cross ✗
+    const drawCross = (x, y, s, alpha) => {
+      ctx.strokeStyle = `rgba(${failRGB}, ${alpha})`;
+      ctx.lineWidth = 1.3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x - s, y - s); ctx.lineTo(x + s, y + s);
+      ctx.moveTo(x + s, y - s); ctx.lineTo(x - s, y + s);
+      ctx.stroke();
+    };
 
     const tick = () => {
+      const now = performance.now();
       ctx.clearRect(0, 0, w, h);
 
-      // ---- click ripple expanding force ring ----
-      let rippleR = 0;
-      if (pressing) {
-        pressT += 18;
-        rippleR = pressT;
-        if (rippleR > 260) { pressing = false; }
+      // ---- cursor halo (soft emerald) ----
+      if (mx > -9000) {
+        const g = ctx.createRadialGradient(mx, my, 0, mx, my, 200);
+        g.addColorStop(0, `rgba(${accentRGB}, 0.09)`);
+        g.addColorStop(0.55, `rgba(${accentRGB}, 0.03)`);
+        g.addColorStop(1, `rgba(${accentRGB}, 0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(mx - 200, my - 200, 400, 400);
       }
 
-      // ---- update dots ----
-      const R2 = REPEL_R * REPEL_R;
-      for (let i = 0; i < dots.length; i++) {
-        const d = dots[i];
-        // spring back to base
-        const sx = (d.bx - d.x) * SPRING;
-        const sy = (d.by - d.y) * SPRING;
-        d.vx = (d.vx + sx) * DAMP;
-        d.vy = (d.vy + sy) * DAMP;
-
-        // repulsion from cursor
-        const dx = d.x - mx, dy = d.y - my;
+      // ---- update + draw cells ----
+      const R2 = RUN_R * RUN_R;
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        const dx = cell.x - mx, dy = cell.y - my;
         const dd = dx * dx + dy * dy;
-        if (dd < R2 && dd > 0.01) {
-          const dist = Math.sqrt(dd);
-          const f = (1 - dist / REPEL_R);
-          const push = f * f * REPEL_STRENGTH * 0.18;
-          d.vx += (dx / dist) * push;
-          d.vy += (dy / dist) * push;
-          d.hi = Math.max(d.hi, f);
-        } else {
-          d.hi *= 0.92;
+        const near = dd < R2;
+
+        // promote idle → running near cursor (staggered by seed)
+        if (cell.state === 'idle' && near) {
+          const proximity = 1 - Math.sqrt(dd) / RUN_R;
+          if (Math.random() < proximity * 0.08 + cell.seed * 0.002) {
+            cell.state = 'running'; cell.t = now;
+          }
+        }
+        // running → passed after RUN_MS
+        if (cell.state === 'running' && now - cell.t > RUN_MS) {
+          cell.state = 'passed'; cell.t = now;
+        }
+        // failed auto-heals to passed after ~700ms
+        if (cell.state === 'failed' && now - cell.t > 700) {
+          cell.state = 'passed'; cell.t = now;
+        }
+        // passed → idle fade
+        if (cell.state === 'passed' && now - cell.t > PASS_FADE) {
+          cell.state = 'idle'; cell.t = now;
         }
 
-        // click ripple impulse
-        if (pressing && rippleR > 0) {
-          const rdx = d.x - mx, rdy = d.y - my;
-          const rdist = Math.sqrt(rdx * rdx + rdy * rdy);
-          const band = Math.abs(rdist - rippleR);
-          if (band < 30) {
-            const force = (1 - band / 30) * 1.4;
-            d.vx += (rdx / (rdist || 1)) * force;
-            d.vy += (rdy / (rdist || 1)) * force;
-            d.hi = Math.max(d.hi, .8);
+        // ---- ripple sweep: assertion burst on click ----
+        for (let k = 0; k < ripples.length; k++) {
+          const rp = ripples[k];
+          const age = now - rp.t0;
+          if (age > 700) continue;
+          const radius = age * 0.55;        // px
+          const rdx = cell.x - rp.x, rdy = cell.y - rp.y;
+          const rd = Math.sqrt(rdx * rdx + rdy * rdy);
+          if (Math.abs(rd - radius) < 28 && cell.state !== 'passed') {
+            cell.state = 'passed'; cell.t = now;
           }
         }
 
-        d.x += d.vx;
-        d.y += d.vy;
+        // ---- render ----
+        if (cell.state === 'idle') {
+          ctx.fillStyle = `rgba(${inkRGB}, 0.10)`;
+          ctx.beginPath(); ctx.arc(cell.x, cell.y, 1.1, 0, Math.PI * 2); ctx.fill();
+        } else if (cell.state === 'running') {
+          // spinner ring sweep
+          const p = (now - cell.t) / RUN_MS;          // 0→1
+          const a0 = (now / 220) % (Math.PI * 2);
+          ctx.strokeStyle = `rgba(${accentRGB}, ${0.55 + 0.25 * Math.sin(p * Math.PI)})`;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(cell.x, cell.y, 5.2, a0, a0 + Math.PI * 1.3);
+          ctx.stroke();
+          // center pulse dot
+          ctx.fillStyle = `rgba(${accentRGB}, 0.7)`;
+          ctx.beginPath(); ctx.arc(cell.x, cell.y, 1.4, 0, Math.PI * 2); ctx.fill();
+        } else if (cell.state === 'passed') {
+          const age = now - cell.t;
+          const fade = age < 220
+            ? age / 220                                  // pop-in
+            : Math.max(0, 1 - (age - 220) / (PASS_FADE - 220));
+          const s = 3.6 * (age < 220 ? (0.6 + 0.4 * (age / 220)) : 1);
+          drawCheck(cell.x, cell.y, s, 0.75 * fade);
+        } else if (cell.state === 'failed') {
+          const age = now - cell.t;
+          const fade = age < 120 ? age / 120 : Math.max(0, 1 - (age - 120) / 580);
+          drawCross(cell.x, cell.y, 3.8, 0.85 * fade);
+        }
       }
 
-      // ---- draw ink trail (cursor) ----
+      // ---- click ripple ring (visual) ----
+      for (let k = ripples.length - 1; k >= 0; k--) {
+        const rp = ripples[k];
+        const age = now - rp.t0;
+        if (age > 800) { ripples.splice(k, 1); continue; }
+        const radius = age * 0.55;
+        const a = Math.max(0, 1 - age / 800);
+        ctx.strokeStyle = `rgba(${accentRGB}, ${a * 0.5})`;
+        ctx.lineWidth = 1.2 + a * 1.6;
+        ctx.beginPath(); ctx.arc(rp.x, rp.y, radius, 0, Math.PI * 2); ctx.stroke();
+      }
+
+      // ---- code-trace cursor trail (dashed) ----
       if (trail.length > 1) {
+        // expire
+        while (trail.length && now - trail[0].t > 460) trail.shift();
+        ctx.setLineDash([3, 4]);
         for (let i = 1; i < trail.length; i++) {
           const a = trail[i - 1], b = trail[i];
           const k = i / trail.length;
-          ctx.strokeStyle = `rgba(${accentRGB}, ${0.06 + k * 0.18})`;
-          ctx.lineWidth = 0.5 + k * 1.8;
-          ctx.lineCap = 'round';
+          ctx.strokeStyle = `rgba(${accentRGB}, ${0.05 + k * 0.22})`;
+          ctx.lineWidth = 0.6 + k * 1.4;
           ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
         }
-        // age out
-        const now = performance.now();
-        while (trail.length && now - trail[0].t > 420) trail.shift();
-      }
-
-      // ---- draw chord beams from cursor to nearest dots within BEAM_R ----
-      const B2 = BEAM_R * BEAM_R;
-      if (mx > -9000) {
-        for (let i = 0; i < dots.length; i++) {
-          const d = dots[i];
-          const dx = d.x - mx, dy = d.y - my;
-          const dd = dx * dx + dy * dy;
-          if (dd < B2) {
-            const k = 1 - Math.sqrt(dd) / BEAM_R;
-            ctx.strokeStyle = `rgba(${accentRGB}, ${k * 0.32})`;
-            ctx.lineWidth = 0.4 + k * 1.2;
-            ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(d.x, d.y); ctx.stroke();
-          }
-        }
-      }
-
-      // ---- draw dots ----
-      for (let i = 0; i < dots.length; i++) {
-        const d = dots[i];
-        // base dot
-        const baseA = 0.10;
-        const r = 1.1 + d.hi * 2.4;
-        ctx.beginPath();
-        // color blends ink → accent as hi rises
-        const ar = baseA + d.hi * 0.6;
-        if (d.hi > 0.06) {
-          ctx.fillStyle = `rgba(${accentRGB}, ${ar})`;
-        } else {
-          ctx.fillStyle = `rgba(${inkRGB}, ${ar})`;
-        }
-        ctx.arc(d.x, d.y, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // ---- soft halo around cursor ----
-      if (mx > -9000) {
-        const g = ctx.createRadialGradient(mx, my, 0, mx, my, 220);
-        g.addColorStop(0, `rgba(${accentRGB}, 0.10)`);
-        g.addColorStop(0.5, `rgba(${accentRGB}, 0.04)`);
-        g.addColorStop(1, `rgba(${accentRGB}, 0)`);
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(mx, my, 220, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.setLineDash([]);
       }
 
       requestAnimationFrame(tick);
