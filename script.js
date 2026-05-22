@@ -213,23 +213,362 @@
     });
   })();
 
-  // ===== Live Test Matrix (flagship, QA-themed background) =====
-  // A grid of "test cells" that execute under your cursor:
-  //   idle ─► running ─► passed (✓)   with rare failed (✗) that auto-heals.
-  // Click sweeps a batch assertion through the grid (green ripple).
-  // The cursor leaves a faint code-trace line.
+  // ===== Shift-Left Defense Line (flagship, QA-themed background) =====
+  // Bugs spawn at the edges and crawl toward a "PROD" line on the right.
+  // QA gates auto-zap some, the cursor squashes the rest with a green ✓ burst.
+  // Any leaker that reaches PROD triggers a red ✗ flash (caught in prod = bad).
   (() => {
     const c = $('#bg-canvas');
     if (!c || prefersReduced) return;
     const ctx = c.getContext('2d');
     let w, h, dpr;
+
+    const bugs = [];
+    const sparks = [];          // {x,y,t0,kind:'kill'|'leak'|'gate', color}
+    const trail = [];
+    const TRAIL_MAX = 18;
+
+    const accentRGB = '24, 169, 87';
+    const failRGB   = '255, 90, 54';
+    const inkRGB    = '10, 10, 12';
+
+    const MAX_BUGS  = 12;
+    const SQUASH_R  = 70;
+    const PROD_X_FRAC = 0.94;   // production line near right edge
+    let prodFlashT = 0;
+
+    let mx = -9999, my = -9999;
+    let mLast = { x: 0, y: 0, t: 0 };
+    let killCount = 0;
+
+    // Two test gates between spawn area and prod line
+    let gates = [];
+
+    const resize = () => {
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      const W = innerWidth, H = innerHeight;
+      c.width = W * dpr; c.height = H * dpr;
+      c.style.width = W + 'px'; c.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      w = W; h = H;
+      gates = [
+        { x: W * 0.40, label: 'unit',   p: 0.55 },
+        { x: W * 0.70, label: 'e2e',    p: 0.65 }
+      ];
+    };
+
+    const spawnBug = () => {
+      if (bugs.length >= MAX_BUGS) return;
+      // spawn from left edge or top/bottom edges
+      const side = Math.random();
+      let x, y;
+      if (side < 0.7) { x = -20; y = 40 + Math.random() * (h - 80); }
+      else if (side < 0.85) { x = Math.random() * w * 0.5; y = -20; }
+      else { x = Math.random() * w * 0.5; y = h + 20; }
+      bugs.push({
+        x, y,
+        vx: 0.35 + Math.random() * 0.55,    // CSS px per frame, rightward
+        vy: (Math.random() - 0.5) * 0.25,
+        phase: Math.random() * Math.PI * 2,
+        wiggleAmp: 0.6 + Math.random() * 0.9,
+        size: 5.2 + Math.random() * 1.6,
+        state: 'crawling',                  // crawling | dying
+        dieT: 0,
+        passedGates: new Set(),
+        seed: Math.random()
+      });
+    };
+
+    // periodic spawner
+    const spawnLoop = () => {
+      spawnBug();
+      setTimeout(spawnLoop, 900 + Math.random() * 1600);
+    };
+    setTimeout(spawnLoop, 700);
+
+    window.addEventListener('pointermove', (e) => {
+      mx = e.clientX; my = e.clientY;
+      const now = performance.now();
+      if (now - mLast.t > 16) {
+        trail.push({ x: mx, y: my, t: now });
+        if (trail.length > TRAIL_MAX) trail.shift();
+        mLast = { x: mx, y: my, t: now };
+      }
+    }, { passive: true });
+    window.addEventListener('pointerleave', () => { mx = -9999; my = -9999; });
+    window.addEventListener('pointerdown', (e) => {
+      // click = "manual squash" — kill any bug in radius
+      for (const b of bugs) {
+        if (b.state !== 'crawling') continue;
+        const dx = b.x - e.clientX, dy = b.y - e.clientY;
+        if (dx*dx + dy*dy < 110*110) killBug(b, 'kill');
+      }
+    });
+
+    const killBug = (b, kind) => {
+      b.state = 'dying';
+      b.dieT = performance.now();
+      const color = kind === 'leak' ? failRGB : accentRGB;
+      // burst of sparks
+      const n = kind === 'leak' ? 14 : 10;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const s = 0.8 + Math.random() * 2.2;
+        sparks.push({
+          x: b.x, y: b.y,
+          vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+          t0: performance.now(), life: 480 + Math.random() * 220,
+          color
+        });
+      }
+      if (kind === 'leak') { prodFlashT = performance.now(); }
+      else { killCount++; }
+    };
+
+    // draw a bug (top-down cartoon insect)
+    const drawBug = (b, now) => {
+      const wiggle = Math.sin(now / 80 + b.phase) * b.wiggleAmp;
+      const angle = Math.atan2(b.vy + wiggle * 0.04, b.vx);
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(angle);
+      const s = b.size;
+
+      // legs (animated)
+      const legPhase = now / 60 + b.phase;
+      ctx.strokeStyle = `rgba(${inkRGB}, 0.85)`;
+      ctx.lineWidth = 1.0;
+      ctx.lineCap = 'round';
+      for (let i = -1; i <= 1; i++) {
+        const off = i * (s * 0.55);
+        const swing = Math.sin(legPhase + i * 1.4) * s * 0.55;
+        // left leg
+        ctx.beginPath();
+        ctx.moveTo(off, -s * 0.35);
+        ctx.lineTo(off + swing * 0.4, -s * 1.25);
+        ctx.stroke();
+        // right leg
+        ctx.beginPath();
+        ctx.moveTo(off, s * 0.35);
+        ctx.lineTo(off - swing * 0.4, s * 1.25);
+        ctx.stroke();
+      }
+
+      // body
+      ctx.fillStyle = `rgba(${inkRGB}, 0.92)`;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 1.55, s * 0.95, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // body sheen
+      ctx.fillStyle = `rgba(${failRGB}, 0.32)`;
+      ctx.beginPath();
+      ctx.ellipse(s * 0.3, -s * 0.25, s * 0.55, s * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // head
+      ctx.fillStyle = `rgba(${inkRGB}, 1)`;
+      ctx.beginPath();
+      ctx.arc(s * 1.45, 0, s * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      // antennae
+      ctx.strokeStyle = `rgba(${inkRGB}, 0.85)`;
+      ctx.lineWidth = 0.9;
+      const aw = Math.sin(legPhase * 1.4) * s * 0.25;
+      ctx.beginPath();
+      ctx.moveTo(s * 1.7, -s * 0.25); ctx.lineTo(s * 2.4 + aw, -s * 0.9);
+      ctx.moveTo(s * 1.7,  s * 0.25); ctx.lineTo(s * 2.4 - aw,  s * 0.9);
+      ctx.stroke();
+
+      ctx.restore();
+    };
+
+    const drawCheck = (x, y, s, alpha, color = accentRGB) => {
+      ctx.strokeStyle = `rgba(${color}, ${alpha})`;
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x - s, y);
+      ctx.lineTo(x - s * 0.25, y + s * 0.75);
+      ctx.lineTo(x + s, y - s * 0.65);
+      ctx.stroke();
+    };
+    const drawCross = (x, y, s, alpha) => {
+      ctx.strokeStyle = `rgba(${failRGB}, ${alpha})`;
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x - s, y - s); ctx.lineTo(x + s, y + s);
+      ctx.moveTo(x + s, y - s); ctx.lineTo(x - s, y + s);
+      ctx.stroke();
+    };
+
+    const tick = () => {
+      const now = performance.now();
+      ctx.clearRect(0, 0, w, h);
+
+      const prodX = w * PROD_X_FRAC;
+
+      // ---- gates (vertical dashed test stations) ----
+      ctx.setLineDash([4, 6]);
+      for (const g of gates) {
+        ctx.strokeStyle = `rgba(${inkRGB}, 0.12)`;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(g.x, 60); ctx.lineTo(g.x, h - 60); ctx.stroke();
+        // label
+        ctx.save();
+        ctx.translate(g.x, 40);
+        ctx.fillStyle = `rgba(${inkRGB}, 0.32)`;
+        ctx.font = '600 9px ui-monospace, "JetBrains Mono", monospace';
+        ctx.fillText(g.label.toUpperCase(), -10, 0);
+        ctx.restore();
+      }
+      ctx.setLineDash([]);
+
+      // ---- PROD line (glowing emerald) ----
+      const prodFlash = Math.max(0, 1 - (now - prodFlashT) / 600);
+      const prodColor = prodFlash > 0 ? failRGB : accentRGB;
+      ctx.strokeStyle = `rgba(${prodColor}, ${0.35 + prodFlash * 0.5})`;
+      ctx.lineWidth = 1.6 + prodFlash * 1.4;
+      ctx.beginPath(); ctx.moveTo(prodX, 30); ctx.lineTo(prodX, h - 30); ctx.stroke();
+      // PROD label rotated
+      ctx.save();
+      ctx.translate(prodX + 10, 60);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = `rgba(${prodColor}, ${0.55 + prodFlash * 0.3})`;
+      ctx.font = '700 10px ui-monospace, "JetBrains Mono", monospace';
+      ctx.fillText('▶ PROD', 0, 0);
+      ctx.restore();
+
+      // ---- update + draw bugs ----
+      for (let i = bugs.length - 1; i >= 0; i--) {
+        const b = bugs[i];
+        if (b.state === 'crawling') {
+          // wiggle perpendicular to motion
+          const w2 = Math.sin(now / 220 + b.phase) * b.wiggleAmp * 0.35;
+          b.x += b.vx;
+          b.y += b.vy + w2;
+          // gentle vertical drift correction toward middle band
+          b.vy += ((h * 0.55 - b.y) * 0.00002);
+
+          // cursor squash check
+          if (mx > -9000) {
+            const dx = b.x - mx, dy = b.y - my;
+            if (dx * dx + dy * dy < SQUASH_R * SQUASH_R) {
+              killBug(b, 'kill');
+            }
+          }
+
+          // gates auto-zap (probabilistic, once per gate)
+          for (const g of gates) {
+            if (b.state !== 'crawling') break;
+            if (!b.passedGates.has(g.label) && b.x >= g.x && b.x <= g.x + b.vx + 1) {
+              b.passedGates.add(g.label);
+              if (Math.random() < g.p) {
+                // gate zap spark on the line at bug y
+                sparks.push({ x: g.x, y: b.y, vx: 0, vy: 0, t0: now, life: 420, color: accentRGB, gate: true });
+                killBug(b, 'kill');
+              }
+            }
+          }
+
+          // reached prod = leak
+          if (b.state === 'crawling' && b.x >= prodX) {
+            b.x = prodX;
+            killBug(b, 'leak');
+          }
+
+          drawBug(b, now);
+        } else if (b.state === 'dying') {
+          const age = now - b.dieT;
+          if (age > 520) { bugs.splice(i, 1); continue; }
+          const fade = 1 - age / 520;
+          // squash mark: ✓ (kill) or ✗ (leak) — leak handled via prodFlash so draw ✗
+          if (b.dieT && b.x >= prodX - 2) {
+            drawCross(b.x, b.y, 7 * (0.6 + (1 - fade) * 0.6), fade);
+          } else {
+            drawCheck(b.x, b.y, 7 * (0.6 + (1 - fade) * 0.6), fade);
+          }
+        }
+      }
+
+      // ---- sparks ----
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const sp = sparks[i];
+        const age = now - sp.t0;
+        if (age > sp.life) { sparks.splice(i, 1); continue; }
+        if (!sp.gate) {
+          sp.x += sp.vx; sp.y += sp.vy;
+          sp.vy += 0.04;
+        }
+        const a = 1 - age / sp.life;
+        ctx.fillStyle = `rgba(${sp.color}, ${a * 0.85})`;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, sp.gate ? 2.4 * a + 1 : 1.6 * a + 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // ---- cursor "scope" — soft red→green halo (green when bug near) ----
+      if (mx > -9000) {
+        let hostile = false;
+        for (const b of bugs) {
+          if (b.state !== 'crawling') continue;
+          const dx = b.x - mx, dy = b.y - my;
+          if (dx*dx + dy*dy < (SQUASH_R + 30) * (SQUASH_R + 30)) { hostile = true; break; }
+        }
+        const col = hostile ? accentRGB : inkRGB;
+        const g = ctx.createRadialGradient(mx, my, 0, mx, my, 90);
+        g.addColorStop(0, `rgba(${col}, ${hostile ? 0.18 : 0.06})`);
+        g.addColorStop(1, `rgba(${col}, 0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(mx - 90, my - 90, 180, 180);
+        if (hostile) {
+          ctx.strokeStyle = `rgba(${accentRGB}, 0.45)`;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 4]);
+          ctx.beginPath(); ctx.arc(mx, my, SQUASH_R, 0, Math.PI * 2); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+
+      // ---- cursor trace (dashed code-trace) ----
+      if (trail.length > 1) {
+        while (trail.length && now - trail[0].t > 380) trail.shift();
+        ctx.setLineDash([3, 4]);
+        for (let i = 1; i < trail.length; i++) {
+          const a = trail[i - 1], bb = trail[i];
+          const k = i / trail.length;
+          ctx.strokeStyle = `rgba(${accentRGB}, ${0.04 + k * 0.18})`;
+          ctx.lineWidth = 0.5 + k * 1.1;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(bb.x, bb.y); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+
+      // ---- HUD counter (subtle, bottom-left) ----
+      ctx.fillStyle = `rgba(${inkRGB}, 0.32)`;
+      ctx.font = '600 10px ui-monospace, "JetBrains Mono", monospace';
+      ctx.fillText(`bugs squashed: ${killCount}`, 20, h - 18);
+
+      requestAnimationFrame(tick);
+    };
+
+    resize();
+    window.addEventListener('resize', resize);
+    tick();
+  })();
+
+  // ===== _OLD_TEST_MATRIX_REMOVED =====
+  if (false) (() => {
+    const c = $('#bg-canvas');
+    if (!c || prefersReduced) return;
+    const ctx = c.getContext('2d');
+    let w, h, dpr;
     let cells = [];
-    const trail = [];                  // pointer trace points
+    const trail = [];
     const TRAIL_MAX = 22;
-    const SPACING   = 46;              // grid spacing (CSS px)
-    const RUN_R     = 130;             // exec radius around cursor
-    const PASS_FADE = 2200;            // ms a passed cell stays bright
-    const RUN_MS    = 280;             // ms in "running" state before pass
+    const SPACING   = 46;
+    const RUN_R     = 130;
+    const PASS_FADE = 2200;
+    const RUN_MS    = 280;
 
     let mx = -9999, my = -9999;
     let mLast = { x: 0, y: 0, t: 0 };
