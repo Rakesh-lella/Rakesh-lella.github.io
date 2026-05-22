@@ -229,10 +229,10 @@
     const FAIL   = '255, 90, 54';
     const INK    = '10, 10, 12';
     const SPECIES = {
-      ladybug:    { primary: '#ef4444', secondary: '#0a0a0c', accent: '#fff1f1', size: 7,   speed: [0.30, 0.55] },
-      bee:        { primary: '#fbbf24', secondary: '#0a0a0c', accent: '#fff7d1', size: 6.5, speed: [0.55, 0.95] },
-      caterpillar:{ primary: '#22c55e', secondary: '#15803d', accent: '#bbf7d0', size: 5.5, speed: [0.25, 0.45] },
-      butterfly:  { primary: '#a855f7', secondary: '#ec4899', accent: '#fce7f3', size: 7.5, speed: [0.45, 0.80] }
+      ladybug:    { primary: '#ef4444', secondary: '#0a0a0c', accent: '#fff1f1', size: 9,    speed: [0.40, 0.75] },
+      bee:        { primary: '#fbbf24', secondary: '#0a0a0c', accent: '#fff7d1', size: 8.5,  speed: [0.70, 1.20] },
+      caterpillar:{ primary: '#22c55e', secondary: '#15803d', accent: '#bbf7d0', size: 7,    speed: [0.35, 0.60] },
+      butterfly:  { primary: '#a855f7', secondary: '#ec4899', accent: '#fce7f3', size: 9.5,  speed: [0.60, 1.05] }
     };
     const SPECIES_KEYS = Object.keys(SPECIES);
 
@@ -242,8 +242,8 @@
     const trail = [];
     const sentinels = [];
 
-    const MAX_BUGS = 12;
-    const SQUASH_R = 70;
+    const MAX_BUGS = 18;
+    const SQUASH_R = 90;
     const PROD_X_FRAC = 0.94;
     let prodFlashT = 0;
     let killCount = 0;
@@ -336,9 +336,9 @@
 
     const spawnLoop = () => {
       spawnBug();
-      setTimeout(spawnLoop, 800 + Math.random() * 1400);
+      setTimeout(spawnLoop, 500 + Math.random() * 900);
     };
-    setTimeout(spawnLoop, 600);
+    setTimeout(spawnLoop, 400);
 
     window.addEventListener('pointermove', (e) => {
       mx = e.clientX; my = e.clientY;
@@ -957,25 +957,25 @@
       }
 
       // ---- HUD (kill attribution) ----
-      const hudW = 220, hudH = 90;
-      const hudX = prodX - hudW - 18, hudY = h * 0.64;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.82)';
-      ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 10); ctx.fill();
-      ctx.strokeStyle = `rgba(${INK}, 0.10)`; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 10); ctx.stroke();
-      ctx.font = '700 10px ui-monospace, "JetBrains Mono", monospace';
+      const hudW = 268, hudH = 110;
+      const hudX = prodX - hudW - 18, hudY = h * 0.60;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+      ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 12); ctx.fill();
+      ctx.strokeStyle = `rgba(${INK}, 0.12)`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 12); ctx.stroke();
+      ctx.font = '700 12px ui-monospace, "JetBrains Mono", monospace';
       // dev unit-test kills (blue)
       ctx.fillStyle = 'rgba(14, 165, 233, 0.95)';
-      ctx.fillText(`⚙ caught by devs (unit): ${devKills}`, hudX + 12, hudY + 18);
+      ctx.fillText(`⚙ caught by devs (unit): ${devKills}`, hudX + 14, hudY + 24);
       // QA kills (emerald)
       ctx.fillStyle = `rgba(${ACCENT}, 0.95)`;
-      ctx.fillText(`● caught by QA:          ${qaKills}`, hudX + 12, hudY + 38);
+      ctx.fillText(`● caught by QA:          ${qaKills}`, hudX + 14, hudY + 47);
       // stealth (purple)
       ctx.fillStyle = `rgba(168, 85, 247, 0.95)`;
-      ctx.fillText(`◆ stealth bugs caught:   ${stealthKills}`, hudX + 12, hudY + 58);
+      ctx.fillText(`◆ stealth bugs caught:   ${stealthKills}`, hudX + 14, hudY + 70);
       // leaked (coral)
       ctx.fillStyle = `rgba(${FAIL}, ${leakCount > 0 ? 0.95 : 0.65})`;
-      ctx.fillText(`✖ leaked to prod:        ${leakCount}`, hudX + 12, hudY + 78);
+      ctx.fillText(`✖ leaked to prod:        ${leakCount}`, hudX + 14, hudY + 93);
 
       requestAnimationFrame(tick);
     };
