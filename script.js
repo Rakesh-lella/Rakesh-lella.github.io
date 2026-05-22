@@ -2309,8 +2309,9 @@
 })();
 
 /* =========================================================
-   WORK SECTION BACKGROUND — CI/CD pipeline storyboard
-   QA writes code → terminal → GitHub push → CI/CD → tests → deploy → production
+   WORK SECTION BACKGROUND — CI/CD pipeline storyboard (detailed)
+   QA writes → git push → GitHub → CI/CD → Tests → Deploy → Production
+   Each stage renders a richer mini-card with dynamic content
    ========================================================= */
 (() => {
   const c = document.getElementById('work-canvas');
@@ -2321,7 +2322,7 @@
   const resize = () => {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     const r = c.getBoundingClientRect();
-    W = Math.max(320, r.width);
+    W = Math.max(360, r.width);
     H = Math.max(280, r.height);
     c.width = W * dpr; c.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2335,117 +2336,425 @@
     { key: 'term',   label: 'git push',   caption: 'origin main', color: '#1d1d22', icon: '>_' },
     { key: 'gh',     label: 'GitHub',     caption: 'main',        color: '#6d3df1', icon: '◆' },
     { key: 'ci',     label: 'CI / CD',    caption: 'pipeline',    color: '#f5a623', icon: '⚙' },
-    { key: 'tests',  label: 'Tests',      caption: 'green',       color: '#18a957', icon: '✓' },
+    { key: 'tests',  label: 'Tests',      caption: '120/120',     color: '#18a957', icon: '✓' },
     { key: 'deploy', label: 'Deploy',     caption: 'rollout',     color: '#ff5a36', icon: '↗' },
-    { key: 'prod',   label: 'Production', caption: 'live',        color: '#0a6f3a', icon: '☁' }
+    { key: 'prod',   label: 'Production', caption: '99.99% live', color: '#0a6f3a', icon: '☁' }
   ];
 
   let packet = { i: 0, t: 0, phase: 'travel', dwellStart: 0, restartAt: 0 };
   let lastT = 0;
-  const PACKET_SPEED = 0.55;
-  const DWELL = 520;
-  const PAUSE_AFTER_LOOP = 1400;
+  const PACKET_SPEED = 0.48;
+  const DWELL = 900;        // ms per station — longer so detailed body anim plays
+  const PAUSE_AFTER_LOOP = 1600;
 
-  const SAFE_LEFT  = 0.06;
-  const SAFE_RIGHT = 0.96;
+  const SAFE_LEFT  = 0.062;
+  const SAFE_RIGHT = 0.938;
+  const CARD_W = 132;
+  const CARD_H = 100;
+  const CARD_Y = 76;        // vertical center of card row (above the section-head)
+
   const stationFor = (i) => {
     const f = SAFE_LEFT + (SAFE_RIGHT - SAFE_LEFT) * (i / (STAGES.length - 1));
-    return { x: W * f, y: H * 0.5, ...STAGES[i] };
+    return { x: W * f, y: CARD_Y, ...STAGES[i] };
   };
 
+  // ----- frame helpers -----
+  const roundRectPath = (x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+
+  // dwell progress 0..1 for the currently-dwelling station (used to drive body animations)
+  const dwellProg = (now) => {
+    if (packet.phase !== 'dwell') return 0;
+    return Math.min(1, (now - packet.dwellStart) / DWELL);
+  };
+
+  // ===== per-station body renderers =====
+  // (cx, cy) is card center; bodyX/bodyY/bodyW/bodyH are the body area inside the card
+  const bodyRect = (cx, cy) => ({
+    x: cx - CARD_W / 2 + 10,
+    y: cy - CARD_H / 2 + 24,
+    w: CARD_W - 20,
+    h: CARD_H - 42
+  });
+
+  // 1. QA writes — code lines being typed
+  const drawBodyQA = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    const lineH = 7;
+    const lines = [
+      { w: 0.55, c: '#0ea5e9' },  // import
+      { w: 0.72, c: '#a855f7' },  // test('login'...
+      { w: 0.45, c: '#1d1d22' },  //   await page.fill
+      { w: 0.62, c: '#1d1d22' },  //   await page.click
+      { w: 0.34, c: '#18a957' }   //   expect(...).toBeVisible
+    ];
+    const showCount = active ? Math.ceil(lines.length * (0.4 + 0.6 * prog)) : lines.length;
+    for (let i = 0; i < lines.length; i++) {
+      const yy = b.y + i * (lineH + 2);
+      const visible = i < showCount;
+      ctx.fillStyle = visible
+        ? (active ? lines[i].c : 'rgba(10,10,12,0.30)')
+        : 'rgba(10,10,12,0.08)';
+      roundRectPath(b.x, yy, b.w * lines[i].w, lineH - 2, 2);
+      ctx.fill();
+    }
+    // blinking cursor at end of currently-typing line
+    if (active && showCount > 0 && showCount <= lines.length) {
+      const li = Math.min(showCount - 1, lines.length - 1);
+      const yy = b.y + li * (lineH + 2);
+      const cursorX = b.x + b.w * lines[li].w + 2;
+      if ((performance.now() % 700) < 380) {
+        ctx.fillStyle = lines[li].c;
+        ctx.fillRect(cursorX, yy, 2, lineH - 2);
+      }
+    }
+  };
+
+  // 2. git push — terminal showing typed command
+  const drawBodyTerm = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    // dark terminal background
+    ctx.fillStyle = '#0f1115';
+    roundRectPath(b.x, b.y, b.w, b.h, 4);
+    ctx.fill();
+    // prompt + command
+    const cmd = 'git push origin main';
+    const shown = active ? Math.floor(cmd.length * Math.min(1, prog * 1.6)) : cmd.length;
+    ctx.fillStyle = '#18a957';
+    ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('$', b.x + 4, b.y + 5);
+    ctx.fillStyle = '#e6e3da';
+    ctx.fillText(cmd.slice(0, shown), b.x + 12, b.y + 5);
+    // blinking cursor
+    if (active && (performance.now() % 700) < 380) {
+      ctx.fillStyle = '#18a957';
+      ctx.fillRect(b.x + 12 + ctx.measureText(cmd.slice(0, shown)).width + 1, b.y + 4, 4, 9);
+    }
+    // response line when nearly done
+    if (active && prog > 0.65) {
+      ctx.fillStyle = 'rgba(125,125,135,0.85)';
+      ctx.font = '500 7px ui-monospace, "JetBrains Mono", monospace';
+      ctx.fillText('→ a1b2c3d main', b.x + 4, b.y + 18);
+    }
+    if (active && prog > 0.85) {
+      ctx.fillStyle = '#18a957';
+      ctx.fillText('✓ pushed', b.x + 4, b.y + 30);
+    }
+  };
+
+  // 3. GitHub — commit graph with branching node
+  const drawBodyGH = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    // main branch vertical line
+    const mx = b.x + 12;
+    ctx.strokeStyle = active ? '#6d3df1' : 'rgba(10,10,12,0.18)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(mx, b.y + 4);
+    ctx.lineTo(mx, b.y + b.h - 4);
+    ctx.stroke();
+    // 3 commit dots
+    const commits = ['a1b2c3d', 'e4f5a6b', '7c8d9e0'];
+    for (let i = 0; i < 3; i++) {
+      const yy = b.y + 8 + i * 14;
+      const isNew = active && prog > (i * 0.25);
+      ctx.fillStyle = isNew ? '#6d3df1' : (active ? 'rgba(109,61,241,0.35)' : 'rgba(10,10,12,0.22)');
+      ctx.beginPath();
+      ctx.arc(mx, yy, 3, 0, Math.PI * 2);
+      ctx.fill();
+      // commit label
+      ctx.fillStyle = isNew ? 'rgba(10,10,12,0.78)' : 'rgba(10,10,12,0.32)';
+      ctx.font = '600 7px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(commits[i], mx + 8, yy);
+    }
+    // branch label
+    ctx.fillStyle = active ? '#6d3df1' : 'rgba(10,10,12,0.40)';
+    ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText('★ main', mx + 8, b.y + b.h - 5);
+  };
+
+  // 4. CI/CD — 4 sub-stages filling in sequence
+  const drawBodyCI = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    const subs = ['lint', 'build', 'test', 'deploy'];
+    const subH = 9;
+    const gap = 2;
+    for (let i = 0; i < subs.length; i++) {
+      const yy = b.y + 2 + i * (subH + gap);
+      const fillP = active ? Math.max(0, Math.min(1, (prog - i * 0.18) * 5)) : 0;
+      // bg
+      ctx.fillStyle = 'rgba(10,10,12,0.06)';
+      roundRectPath(b.x, yy, b.w, subH, 2);
+      ctx.fill();
+      // progress fill
+      if (fillP > 0) {
+        ctx.fillStyle = '#f5a623';
+        roundRectPath(b.x, yy, b.w * fillP, subH, 2);
+        ctx.fill();
+      }
+      // label
+      ctx.fillStyle = fillP > 0.5 ? '#ffffff' : 'rgba(10,10,12,0.6)';
+      ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(subs[i], b.x + 4, yy + subH / 2);
+      // tick when fully done
+      if (fillP >= 1) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText('✓', b.x + b.w - 4, yy + subH / 2);
+      }
+    }
+  };
+
+  // 5. Tests — 5×3 grid of dots filling green sequentially
+  const drawBodyTests = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    const cols = 6, rows = 3;
+    const total = cols * rows;
+    const passed = active ? Math.floor(total * prog) : total;
+    const cw = (b.w - 2) / cols;
+    const ch = (b.h - 4) / rows;
+    for (let r = 0; r < rows; r++) {
+      for (let cc = 0; cc < cols; cc++) {
+        const idx = r * cols + cc;
+        const xx = b.x + cc * cw + cw / 2;
+        const yy = b.y + r * ch + ch / 2;
+        const on = idx < passed;
+        ctx.fillStyle = on ? '#18a957' : (active ? 'rgba(24,169,87,0.18)' : 'rgba(10,10,12,0.10)');
+        ctx.beginPath();
+        ctx.arc(xx, yy, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // counter
+    if (active) {
+      ctx.fillStyle = '#18a957';
+      ctx.font = '700 7px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`${passed}/${total} ✓`, b.x + b.w, b.y + b.h);
+    }
+  };
+
+  // 6. Deploy — progress bar + rocket moving across
+  const drawBodyDeploy = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    const barY = b.y + b.h * 0.55;
+    const barH = 6;
+    // track
+    ctx.fillStyle = 'rgba(10,10,12,0.08)';
+    roundRectPath(b.x, barY, b.w, barH, 3);
+    ctx.fill();
+    // fill
+    const fillP = active ? Math.min(1, prog * 1.1) : 1;
+    if (fillP > 0) {
+      const g = ctx.createLinearGradient(b.x, 0, b.x + b.w, 0);
+      g.addColorStop(0, '#ff7d54');
+      g.addColorStop(1, '#ff5a36');
+      ctx.fillStyle = g;
+      roundRectPath(b.x, barY, b.w * fillP, barH, 3);
+      ctx.fill();
+    }
+    // rocket
+    const rx = b.x + b.w * fillP;
+    ctx.font = '700 12px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ff5a36';
+    ctx.fillText('↗', Math.max(b.x + 4, Math.min(b.x + b.w - 4, rx)), barY - 8);
+    // pct text
+    if (active) {
+      ctx.fillStyle = '#ff5a36';
+      ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${Math.round(fillP * 100)}%`, b.x + b.w, barY + 16);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(10,10,12,0.6)';
+      ctx.font = '600 8px ui-monospace, "JetBrains Mono", monospace';
+      ctx.fillText('rollout', b.x, barY + 16);
+    }
+  };
+
+  // 7. Production — heartbeat pulse + 200 OK
+  const drawBodyProd = (cx, cy, active, prog) => {
+    const b = bodyRect(cx, cy);
+    const px = b.x + b.w / 2;
+    const py = b.y + b.h / 2 - 4;
+    // pulse rings
+    if (active) {
+      for (let k = 0; k < 2; k++) {
+        const t = ((performance.now() / 1100) + k * 0.5) % 1;
+        const rr = 6 + t * 22;
+        ctx.strokeStyle = '#0a6f3a';
+        ctx.globalAlpha = (1 - t) * 0.4;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(px, py, rr, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    // core dot
+    ctx.fillStyle = active ? '#0a6f3a' : 'rgba(10,10,12,0.18)';
+    ctx.beginPath();
+    ctx.arc(px, py, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('✓', px, py + 1);
+    // status text
+    ctx.fillStyle = active ? '#0a6f3a' : 'rgba(10,10,12,0.4)';
+    ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('200 OK', px, b.y + b.h - 4);
+  };
+
+  const BODY_RENDERERS = {
+    qa: drawBodyQA, term: drawBodyTerm, gh: drawBodyGH, ci: drawBodyCI,
+    tests: drawBodyTests, deploy: drawBodyDeploy, prod: drawBodyProd
+  };
+
+  // ===== station card frame + header =====
+  const drawStation = (i, active, glow, prog) => {
+    const s = stationFor(i);
+    const x = s.x - CARD_W / 2;
+    const y = s.y - CARD_H / 2;
+    ctx.save();
+
+    // outer glow when active
+    if (glow > 0) {
+      ctx.shadowColor = s.color;
+      ctx.shadowBlur = 18 * glow;
+      ctx.strokeStyle = s.color;
+      ctx.globalAlpha = 0.5 * glow;
+      ctx.lineWidth = 2;
+      roundRectPath(x - 2, y - 2, CARD_W + 4, CARD_H + 4, 12);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+    }
+
+    // card body
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = active ? s.color : 'rgba(10,10,12,0.10)';
+    ctx.lineWidth = active ? 1.6 : 1;
+    ctx.shadowColor = 'rgba(10,10,12,0.08)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+    roundRectPath(x, y, CARD_W, CARD_H, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    // header strip
+    ctx.fillStyle = active ? s.color : 'rgba(10,10,12,0.04)';
+    roundRectPath(x, y, CARD_W, 22, 10);
+    ctx.fill();
+    // clip header bottom corners flat
+    ctx.fillStyle = active ? s.color : 'rgba(10,10,12,0.04)';
+    ctx.fillRect(x, y + 14, CARD_W, 8);
+
+    // icon
+    ctx.fillStyle = active ? '#ffffff' : s.color;
+    ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(s.icon, x + 8, y + 11);
+
+    // label
+    ctx.fillStyle = active ? '#ffffff' : 'rgba(10,10,12,0.78)';
+    ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText(s.label.toUpperCase(), x + 24, y + 11);
+
+    // caption (top right)
+    ctx.fillStyle = active ? 'rgba(255,255,255,0.85)' : 'rgba(10,10,12,0.45)';
+    ctx.font = '500 7px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(s.caption, x + CARD_W - 8, y + 11);
+
+    // body
+    const renderer = BODY_RENDERERS[s.key];
+    if (renderer) renderer(s.x, s.y, active, prog);
+
+    // status indicator bottom
+    ctx.fillStyle = active ? s.color : 'rgba(10,10,12,0.08)';
+    roundRectPath(x + 6, y + CARD_H - 4, CARD_W - 12, 2, 1);
+    ctx.fill();
+
+    ctx.restore();
+  };
+
+  // ===== pipe between cards (only the visible gap, not under the card) =====
   const drawPipe = () => {
     ctx.save();
-    ctx.strokeStyle = 'rgba(10,10,12,0.10)';
+    ctx.strokeStyle = 'rgba(10,10,12,0.14)';
     ctx.lineWidth = 1.4;
-    ctx.setLineDash([4, 7]);
-    ctx.beginPath();
-    const a = stationFor(0), z = stationFor(STAGES.length - 1);
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(z.x, z.y);
-    ctx.stroke();
+    ctx.setLineDash([4, 6]);
+    for (let i = 0; i < STAGES.length - 1; i++) {
+      const a = stationFor(i);
+      const b = stationFor(i + 1);
+      const x1 = a.x + CARD_W / 2;
+      const x2 = b.x - CARD_W / 2;
+      if (x2 > x1) {
+        ctx.beginPath();
+        ctx.moveTo(x1, a.y);
+        ctx.lineTo(x2, b.y);
+        ctx.stroke();
+      }
+    }
     ctx.setLineDash([]);
     ctx.restore();
   };
 
-  const drawStation = (i, active, glow) => {
-    const s = stationFor(i);
-    const R = 26;
-    ctx.save();
-    // base disc
-    ctx.fillStyle = active ? s.color : '#ffffff';
-    ctx.strokeStyle = active ? s.color : 'rgba(10,10,12,0.14)';
-    ctx.lineWidth = active ? 2 : 1.2;
-    ctx.shadowColor = 'rgba(10,10,12,0.06)';
-    ctx.shadowBlur = active ? 0 : 10;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, R, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    if (glow > 0) {
-      ctx.strokeStyle = s.color;
-      ctx.globalAlpha = glow * 0.6;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, R + 6 + glow * 8, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-
-    // icon
-    ctx.fillStyle = active ? '#ffffff' : s.color;
-    ctx.font = '700 13px ui-monospace, "JetBrains Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(s.icon, s.x, s.y + 1);
-
-    // label
-    ctx.fillStyle = active ? s.color : 'rgba(10,10,12,0.78)';
-    ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
-    ctx.fillText(s.label, s.x, s.y + R + 14);
-
-    // caption
-    ctx.fillStyle = 'rgba(10,10,12,0.45)';
-    ctx.font = '500 10px ui-monospace, "JetBrains Mono", monospace';
-    ctx.fillText(s.caption, s.x, s.y + R + 28);
-
-    ctx.restore();
-  };
-
+  // ===== packet between cards =====
   const drawPacket = () => {
     if (packet.phase !== 'travel') return;
     if (packet.i >= STAGES.length - 1) return;
     const a = stationFor(packet.i);
     const b = stationFor(packet.i + 1);
+    const x1 = a.x + CARD_W / 2;
+    const x2 = b.x - CARD_W / 2;
     const t = packet.t;
-    // ease
     const e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
-    const px = a.x + (b.x - a.x) * e;
+    const px = x1 + (x2 - x1) * e;
     const py = a.y + (b.y - a.y) * e;
     ctx.save();
-    // outer glow
     ctx.shadowColor = b.color;
-    ctx.shadowBlur = 22;
+    ctx.shadowBlur = 18;
     ctx.fillStyle = b.color;
     ctx.beginPath();
-    ctx.arc(px, py, 5.5, 0, Math.PI * 2);
+    ctx.arc(px, py, 4.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
-    // core
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+    ctx.arc(px, py, 1.8, 0, Math.PI * 2);
     ctx.fill();
     // trailing sparks
     for (let k = 1; k <= 4; k++) {
-      const tk = Math.max(0, e - k * 0.04);
-      const tx = a.x + (b.x - a.x) * tk;
+      const tk = Math.max(0, e - k * 0.05);
+      const tx = x1 + (x2 - x1) * tk;
       const ty = a.y + (b.y - a.y) * tk;
       ctx.globalAlpha = (4 - k) / 6;
       ctx.fillStyle = b.color;
       ctx.beginPath();
-      ctx.arc(tx, ty, 3 - k * 0.5, 0, Math.PI * 2);
+      ctx.arc(tx, ty, 2.6 - k * 0.4, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -2486,6 +2795,8 @@
       }
     }
 
+    const prog = dwellProg(now);
+
     // draw all stations
     for (let i = 0; i < STAGES.length; i++) {
       const active =
@@ -2495,7 +2806,8 @@
       const glow = (i === packet.i && packet.phase === 'dwell')
         ? Math.max(0, 1 - (now - packet.dwellStart) / DWELL)
         : 0;
-      drawStation(i, active, glow);
+      const stationProg = (i === packet.i && packet.phase === 'dwell') ? prog : (active ? 1 : 0);
+      drawStation(i, active, glow, stationProg);
     }
 
     drawPacket();

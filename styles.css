@@ -152,8 +152,9 @@ body.loading { overflow: hidden; }
   pointer-events: none;
   opacity: 1;
 }
-#work { overflow: hidden; }
+#work { overflow: hidden; padding-top: clamp(180px, 20vh, 240px); }
 #work .container { position: relative; z-index: 1; }
+#work .section-head { margin-top: 24px; }
 .bg-noise {
   position: fixed; inset: 0; z-index: 1;
   pointer-events: none;
