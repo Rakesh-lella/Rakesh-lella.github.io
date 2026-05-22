@@ -317,10 +317,24 @@
 
     // Different categories of bugs QA actually finds in the field — used as a per-bug type tag
     const BUG_TYPES = [
-      'RACE CONDITION', 'FLAKY TEST', 'EDGE CASE', 'REGRESSION',
-      'MEMORY LEAK',    'TIMEOUT',    'UI GLITCH', 'VALIDATION',
-      'AUTH BUG',       'INTEGRATION','BOUNDARY',  'NULL POINTER',
-      'PERF',           'CONCURRENCY','OFF-BY-ONE','LOCALE'
+      'Spelling mistake', 'Grammar issue', 'Alignment issue', 'Overlapping text',
+      'Broken link', 'Button not clickable', 'Dropdown not loading', 'Page crash',
+      'Infinite loading', 'Slow response', 'Wrong calculation', 'Incorrect validation',
+      'Missing field', 'Duplicate record', 'Data mismatch', 'Wrong error message',
+      'Empty error message', 'Image not loading', 'API failure', 'Timeout issue',
+      'Session timeout', 'Unauthorized access', 'SQL injection', 'XSS vulnerability',
+      'CSRF issue', 'File upload failure', 'Download failure', 'Incorrect date format',
+      'Currency conversion issue', 'Sorting issue', 'Filter not working', 'Search not working',
+      'Pagination issue', 'Responsive UI issue', 'Browser compatibility', 'Mobile view broken',
+      'Color mismatch', 'Font issue', 'Label mismatch', 'Broken workflow',
+      'Incorrect redirection', 'Data not saved', 'Data loss', 'Cache issue',
+      'Sync issue', 'Race condition', 'Null pointer exception', 'Memory leak',
+      'High CPU usage', 'Authentication failure', 'Authorization issue', 'Permission issue',
+      'OTP failure', 'Email not triggered', 'Notification issue', 'Integration failure',
+      'XML mapping issue', 'JSON schema mismatch', 'Mandatory field bypass', 'Boundary value failure',
+      'Special character issue', 'Encoding issue', 'Localization issue', 'Timezone issue',
+      'Regression issue', 'Flaky behavior', 'Environment issue', 'Configuration issue',
+      'Deployment issue', 'Server down'
     ];
 
     const spawnBug = () => {
