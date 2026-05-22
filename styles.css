@@ -140,10 +140,20 @@ body.loading { overflow: hidden; }
 
 /* ---------- BACKDROP ---------- */
 .bg-canvas {
-  position: fixed; inset: 0; z-index: -1;
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100vh;
+  z-index: -1;
   pointer-events: none;
   opacity: 1;
 }
+.work-canvas {
+  position: absolute; inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 1;
+}
+#work { overflow: hidden; }
+#work .container { position: relative; z-index: 1; }
 .bg-noise {
   position: fixed; inset: 0; z-index: 1;
   pointer-events: none;

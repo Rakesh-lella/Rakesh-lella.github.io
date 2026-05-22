@@ -2307,3 +2307,200 @@
   })();
 
 })();
+
+/* =========================================================
+   WORK SECTION BACKGROUND — CI/CD pipeline storyboard
+   QA writes code → terminal → GitHub push → CI/CD → tests → deploy → production
+   ========================================================= */
+(() => {
+  const c = document.getElementById('work-canvas');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  let dpr = 1, W = 0, H = 0;
+
+  const resize = () => {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    const r = c.getBoundingClientRect();
+    W = Math.max(320, r.width);
+    H = Math.max(280, r.height);
+    c.width = W * dpr; c.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(c);
+  window.addEventListener('resize', resize);
+  resize();
+
+  const STAGES = [
+    { key: 'qa',     label: 'QA writes',  caption: 'Playwright',  color: '#0ea5e9', icon: '✎' },
+    { key: 'term',   label: 'git push',   caption: 'origin main', color: '#1d1d22', icon: '>_' },
+    { key: 'gh',     label: 'GitHub',     caption: 'main',        color: '#6d3df1', icon: '◆' },
+    { key: 'ci',     label: 'CI / CD',    caption: 'pipeline',    color: '#f5a623', icon: '⚙' },
+    { key: 'tests',  label: 'Tests',      caption: 'green',       color: '#18a957', icon: '✓' },
+    { key: 'deploy', label: 'Deploy',     caption: 'rollout',     color: '#ff5a36', icon: '↗' },
+    { key: 'prod',   label: 'Production', caption: 'live',        color: '#0a6f3a', icon: '☁' }
+  ];
+
+  let packet = { i: 0, t: 0, phase: 'travel', dwellStart: 0, restartAt: 0 };
+  let lastT = 0;
+  const PACKET_SPEED = 0.55;
+  const DWELL = 520;
+  const PAUSE_AFTER_LOOP = 1400;
+
+  const SAFE_LEFT  = 0.06;
+  const SAFE_RIGHT = 0.96;
+  const stationFor = (i) => {
+    const f = SAFE_LEFT + (SAFE_RIGHT - SAFE_LEFT) * (i / (STAGES.length - 1));
+    return { x: W * f, y: H * 0.5, ...STAGES[i] };
+  };
+
+  const drawPipe = () => {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(10,10,12,0.10)';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([4, 7]);
+    ctx.beginPath();
+    const a = stationFor(0), z = stationFor(STAGES.length - 1);
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(z.x, z.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  };
+
+  const drawStation = (i, active, glow) => {
+    const s = stationFor(i);
+    const R = 26;
+    ctx.save();
+    // base disc
+    ctx.fillStyle = active ? s.color : '#ffffff';
+    ctx.strokeStyle = active ? s.color : 'rgba(10,10,12,0.14)';
+    ctx.lineWidth = active ? 2 : 1.2;
+    ctx.shadowColor = 'rgba(10,10,12,0.06)';
+    ctx.shadowBlur = active ? 0 : 10;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    if (glow > 0) {
+      ctx.strokeStyle = s.color;
+      ctx.globalAlpha = glow * 0.6;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, R + 6 + glow * 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // icon
+    ctx.fillStyle = active ? '#ffffff' : s.color;
+    ctx.font = '700 13px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(s.icon, s.x, s.y + 1);
+
+    // label
+    ctx.fillStyle = active ? s.color : 'rgba(10,10,12,0.78)';
+    ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText(s.label, s.x, s.y + R + 14);
+
+    // caption
+    ctx.fillStyle = 'rgba(10,10,12,0.45)';
+    ctx.font = '500 10px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText(s.caption, s.x, s.y + R + 28);
+
+    ctx.restore();
+  };
+
+  const drawPacket = () => {
+    if (packet.phase !== 'travel') return;
+    if (packet.i >= STAGES.length - 1) return;
+    const a = stationFor(packet.i);
+    const b = stationFor(packet.i + 1);
+    const t = packet.t;
+    // ease
+    const e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+    const px = a.x + (b.x - a.x) * e;
+    const py = a.y + (b.y - a.y) * e;
+    ctx.save();
+    // outer glow
+    ctx.shadowColor = b.color;
+    ctx.shadowBlur = 22;
+    ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.arc(px, py, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // core
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    // trailing sparks
+    for (let k = 1; k <= 4; k++) {
+      const tk = Math.max(0, e - k * 0.04);
+      const tx = a.x + (b.x - a.x) * tk;
+      const ty = a.y + (b.y - a.y) * tk;
+      ctx.globalAlpha = (4 - k) / 6;
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3 - k * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  };
+
+  const tick = (now) => {
+    if (!lastT) lastT = now;
+    const dt = Math.min(80, now - lastT); lastT = now;
+
+    ctx.clearRect(0, 0, W, H);
+    drawPipe();
+
+    // state machine
+    if (packet.phase === 'travel') {
+      packet.t += (dt / 1000) * PACKET_SPEED;
+      if (packet.t >= 1) {
+        packet.t = 1;
+        packet.phase = 'dwell';
+        packet.dwellStart = now;
+      }
+    } else if (packet.phase === 'dwell') {
+      if (now - packet.dwellStart > DWELL) {
+        packet.i += 1;
+        if (packet.i >= STAGES.length - 1) {
+          packet.phase = 'restart';
+          packet.restartAt = now + PAUSE_AFTER_LOOP;
+        } else {
+          packet.phase = 'travel';
+          packet.t = 0;
+        }
+      }
+    } else if (packet.phase === 'restart') {
+      if (now > packet.restartAt) {
+        packet.i = 0;
+        packet.t = 0;
+        packet.phase = 'travel';
+      }
+    }
+
+    // draw all stations
+    for (let i = 0; i < STAGES.length; i++) {
+      const active =
+        i < packet.i ||
+        (i === packet.i && (packet.phase === 'dwell' || packet.phase === 'restart')) ||
+        (packet.phase === 'restart' && i === STAGES.length - 1);
+      const glow = (i === packet.i && packet.phase === 'dwell')
+        ? Math.max(0, 1 - (now - packet.dwellStart) / DWELL)
+        : 0;
+      drawStation(i, active, glow);
+    }
+
+    drawPacket();
+
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})();
