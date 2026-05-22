@@ -3945,3 +3945,642 @@
   };
   requestAnimationFrame(tick);
 })();
+
+/* =========================================================
+   INLINE CARD MINI-ANIMATIONS — for bento card previews
+   - card-canvas-api    : request/response cycle (GET/POST/PUT/DELETE)
+   - card-canvas-locust : live RPS chart cycling LOAD/SPIKE/STRESS/SOAK/STEP
+   - card-canvas-zap    : OWASP ZAP security scan with vulnerability counters
+   ========================================================= */
+
+// shared helper
+(() => {
+  if (window.__cardCanvasShared) return;
+  window.__cardCanvasShared = true;
+
+  window.__setupCardCanvas = (id, sizer) => {
+    const c = document.getElementById(id);
+    if (!c) return null;
+    const ctx = c.getContext('2d');
+    let dpr = 1, W = 0, H = 0;
+    const resize = () => {
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      const r = c.getBoundingClientRect();
+      W = Math.max(220, r.width);
+      H = Math.max(80,  r.height);
+      c.width = W * dpr; c.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (sizer) sizer(W, H);
+    };
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(c);
+    window.addEventListener('resize', resize);
+    resize();
+    return { c, ctx, get W(){ return W; }, get H(){ return H; } };
+  };
+
+  window.__roundRect = (ctx, x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+
+  window.__hexToRgb = (hex) => {
+    const h = hex.replace('#', '');
+    return {
+      r: parseInt(h.slice(0, 2), 16),
+      g: parseInt(h.slice(2, 4), 16),
+      b: parseInt(h.slice(4, 6), 16)
+    };
+  };
+})();
+
+/* ---------- 1. REST API mini ---------- */
+(() => {
+  const cv = window.__setupCardCanvas && window.__setupCardCanvas('card-canvas-api');
+  if (!cv) return;
+  const { ctx } = cv;
+  const roundRect = (x,y,w,h,r) => window.__roundRect(ctx,x,y,w,h,r);
+
+  const METHODS = [
+    { name: 'GET',    color: '#18a957', path: '/api/users',     status: '200 OK',      sColor: '#18a957', body: '[ { "id":1, "name":"Ada" } ]' },
+    { name: 'POST',   color: '#6d3df1', path: '/api/users',     status: '201 Created', sColor: '#18a957', body: '{ "id": 42, "name": "Lin" }' },
+    { name: 'PUT',    color: '#f59e0b', path: '/api/users/42',  status: '200 OK',      sColor: '#18a957', body: '{ "role": "admin" }' },
+    { name: 'DELETE', color: '#ef4444', path: '/api/users/42',  status: '204',          sColor: '#475569', body: '(no body)' }
+  ];
+
+  const PHASES = ['type', 'send', 'resp', 'pause'];
+  const DUR = { type: 700, send: 600, resp: 1000, pause: 800 };
+  let mi = 0, ph = 0, t0 = 0, last = 0;
+
+  const advance = (now) => {
+    if (now - t0 < DUR[PHASES[ph]]) return;
+    t0 = now;
+    ph = (ph + 1) % PHASES.length;
+    if (ph === 0) mi = (mi + 1) % METHODS.length;
+  };
+  const prog = (now) => Math.min(1, Math.max(0, (now - t0) / DUR[PHASES[ph]]));
+  const phase = () => PHASES[ph];
+
+  const tick = (now) => {
+    if (!last) { last = now; t0 = now; }
+    last = now;
+    advance(now);
+    const W = cv.W, H = cv.H;
+    ctx.clearRect(0, 0, W, H);
+    const m = METHODS[mi];
+
+    // ----- top row: METHOD + URL + Send -----
+    const padX = 10;
+    const rowY = 8;
+    const rowH = 22;
+    // method pill
+    ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+    const mw = Math.max(40, ctx.measureText(m.name).width + 12);
+    ctx.fillStyle = m.color;
+    roundRect(padX, rowY, mw, rowH, 4);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(m.name, padX + mw / 2, rowY + rowH / 2);
+
+    // url bar
+    const btnW = 44;
+    const urlX = padX + mw + 6;
+    const urlW = W - urlX - padX - btnW - 6;
+    ctx.fillStyle = 'rgba(10,10,12,0.05)';
+    roundRect(urlX, rowY, urlW, rowH, 4);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(10,10,12,0.10)';
+    ctx.lineWidth = 1;
+    roundRect(urlX + 0.5, rowY + 0.5, urlW - 1, rowH - 1, 4);
+    ctx.stroke();
+    // typed path
+    let typed = m.path;
+    if (phase() === 'type') typed = m.path.slice(0, Math.ceil(m.path.length * prog(now)));
+    ctx.fillStyle = 'rgba(10,10,12,0.80)';
+    ctx.font = '600 9px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(typed, urlX + 6, rowY + rowH / 2);
+    if (phase() === 'type' && (performance.now() % 700) < 380) {
+      const cw = ctx.measureText(typed).width;
+      ctx.fillStyle = m.color;
+      ctx.fillRect(urlX + 6 + cw + 1, rowY + 4, 2, rowH - 8);
+    }
+    // send btn
+    const btnX = W - padX - btnW;
+    const sending = phase() === 'send';
+    if (sending) { ctx.shadowColor = m.color; ctx.shadowBlur = 10; }
+    ctx.fillStyle = phase() === 'type' && prog(now) < 0.6 ? 'rgba(10,10,12,0.30)' : m.color;
+    roundRect(btnX, rowY, btnW, rowH, 4);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(sending ? '…' : 'Send', btnX + btnW / 2, rowY + rowH / 2);
+
+    // ----- flying packet (dashed lane) on send -----
+    const laneY = rowY + rowH + 16;
+    ctx.strokeStyle = 'rgba(10,10,12,0.12)';
+    ctx.setLineDash([3, 5]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padX, laneY);
+    ctx.lineTo(W - padX, laneY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (sending) {
+      const t = prog(now);
+      const e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+      const px = padX + (W - padX * 2) * e;
+      ctx.shadowColor = m.color;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = m.color;
+      ctx.beginPath();
+      ctx.arc(px, laneY, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      for (let k = 1; k <= 4; k++) {
+        const tk = Math.max(0, e - k * 0.05);
+        const tx = padX + (W - padX * 2) * tk;
+        ctx.globalAlpha = (4 - k) / 6;
+        ctx.fillStyle = m.color;
+        ctx.beginPath();
+        ctx.arc(tx, laneY, 2.6 - k * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // ----- response row -----
+    const respY = laneY + 14;
+    const respH = H - respY - 8;
+    const showResp = phase() === 'resp' || phase() === 'pause';
+    // status badge
+    ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+    const sw = Math.max(36, ctx.measureText(m.status).width + 12);
+    if (showResp) {
+      ctx.fillStyle = m.sColor;
+      roundRect(padX, respY, sw, 18, 3);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(m.status, padX + sw / 2, respY + 9);
+    } else {
+      ctx.fillStyle = 'rgba(10,10,12,0.06)';
+      roundRect(padX, respY, sw, 18, 3);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(10,10,12,0.40)';
+      ctx.font = '600 9px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(sending ? '…' : '—', padX + sw / 2, respY + 9);
+    }
+    // body preview (dark editor)
+    const bx = padX + sw + 8;
+    const bw = W - padX - bx;
+    ctx.fillStyle = '#0f1115';
+    roundRect(bx, respY, bw, 18, 3);
+    ctx.fill();
+    if (showResp) {
+      let bodyTxt = m.body;
+      if (phase() === 'resp') {
+        bodyTxt = m.body.slice(0, Math.ceil(m.body.length * prog(now)));
+      }
+      ctx.fillStyle = '#7dd3a0';
+      ctx.font = '600 9px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      // truncate if too long
+      let s = bodyTxt;
+      while (ctx.measureText(s).width > bw - 12 && s.length) s = s.slice(0, -1);
+      if (s !== bodyTxt) s = s.slice(0, -1) + '…';
+      ctx.fillText(s, bx + 6, respY + 9);
+    }
+
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})();
+
+/* ---------- 2. Locust mini ---------- */
+(() => {
+  const cv = window.__setupCardCanvas && window.__setupCardCanvas('card-canvas-locust');
+  if (!cv) return;
+  const { ctx } = cv;
+  const roundRect = (x,y,w,h,r) => window.__roundRect(ctx,x,y,w,h,r);
+  const hexToRgb = window.__hexToRgb;
+
+  const PROFILES = [
+    { name: 'LOAD',   color: '#16c47b',
+      curve: (p) => ({ u: p < 0.35 ? (p/0.35)*100 : 100, r: p < 0.35 ? (p/0.35)*450 : 450 + Math.sin(p*18)*16 }), maxU: 100, maxR: 500 },
+    { name: 'SPIKE',  color: '#ef4444',
+      curve: (p) => {
+        let u, r;
+        if (p < 0.25) { u = (p/0.25)*40; r = (p/0.25)*150; }
+        else if (p < 0.40) { const k = (p-0.25)/0.15; u = 40 + k*210; r = 150 + k*750; }
+        else if (p < 0.80) { u = 250; r = 900 + Math.sin(p*30)*18; }
+        else { const k = 1 - (p-0.80)/0.20; u = 250*k; r = 900*k; }
+        return { u, r };
+      }, maxU: 250, maxR: 950 },
+    { name: 'STRESS', color: '#f59e0b',
+      curve: (p) => {
+        const u = Math.min(300, p*320);
+        let r;
+        if (p < 0.65) r = (p/0.65)*680;
+        else r = Math.max(160, 680 - ((p-0.65)/0.35)*500);
+        return { u, r };
+      }, maxU: 300, maxR: 720 },
+    { name: 'SOAK',   color: '#0ea5e9',
+      curve: (p) => ({ u: p < 0.1 ? (p/0.1)*80 : 80, r: p < 0.1 ? (p/0.1)*330 : 330 + Math.sin(p*40)*10 }), maxU: 80, maxR: 360 },
+    { name: 'STEP',   color: '#a855f7',
+      curve: (p) => {
+        const steps = 5;
+        const idx = Math.min(steps, Math.floor(p*steps) + 1);
+        return { u: idx*20, r: idx*100 - 5 };
+      }, maxU: 100, maxR: 500 }
+  ];
+
+  const PH_DUR = { intro: 600, run: 4500, cooldown: 700 };
+  const PH_ORDER = ['intro', 'run', 'cooldown'];
+  let st = { pi: 0, ph: 0, t0: 0 };
+  let last = 0;
+
+  const POINTS = 50;
+  let buf = new Array(POINTS).fill(0);
+  let head = 0;
+
+  const advance = (now) => {
+    const cur = PH_ORDER[st.ph];
+    if (now - st.t0 < PH_DUR[cur]) return;
+    st.t0 = now;
+    st.ph = (st.ph + 1) % PH_ORDER.length;
+    if (st.ph === 0) {
+      st.pi = (st.pi + 1) % PROFILES.length;
+      buf.fill(0); head = 0;
+    }
+  };
+  const prog = (now) => {
+    const cur = PH_ORDER[st.ph];
+    return Math.min(1, Math.max(0, (now - st.t0) / PH_DUR[cur]));
+  };
+  const phaseN = () => PH_ORDER[st.ph];
+
+  const sample = (now) => {
+    const pr = PROFILES[st.pi];
+    if (phaseN() === 'intro') return { u: 0, r: 0 };
+    if (phaseN() === 'run') return pr.curve(prog(now));
+    // cooldown
+    const k = 1 - prog(now);
+    const last = pr.curve(1);
+    return { u: last.u * k, r: last.r * k };
+  };
+
+  const tick = (now) => {
+    if (!last) { last = now; st.t0 = now; }
+    last = now;
+    advance(now);
+    const W = cv.W, H = cv.H;
+    ctx.clearRect(0, 0, W, H);
+    const pr = PROFILES[st.pi];
+    const s = sample(now);
+
+    if (!tick._lastSample || now - tick._lastSample > 80) {
+      buf[head] = s.r;
+      head = (head + 1) % POINTS;
+      tick._lastSample = now;
+    }
+
+    // left panel — profile name + users + status
+    const leftW = Math.max(110, W * 0.32);
+    const padX = 10;
+    // profile name
+    ctx.fillStyle = pr.color;
+    ctx.font = '900 14px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(pr.name, padX, 8);
+    // small status dot
+    const dotX = padX + ctx.measureText(pr.name).width + 8;
+    const pulse = phaseN() === 'run' || phaseN() === 'intro';
+    if (pulse) {
+      const a = 0.5 + 0.5 * Math.sin(now / 240);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = pr.color;
+      ctx.beginPath();
+      ctx.arc(dotX, 16, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    // users count
+    ctx.fillStyle = '#1d1d22';
+    ctx.font = '900 22px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(String(Math.round(s.u)), padX, 30);
+    ctx.fillStyle = 'rgba(10,10,12,0.45)';
+    ctx.font = '600 8px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText(`/ ${pr.maxU} users`, padX, 58);
+    // RPS
+    ctx.fillStyle = pr.color;
+    ctx.font = '700 14px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText(`${Math.round(s.r)}`, padX, 76);
+    ctx.fillStyle = 'rgba(10,10,12,0.45)';
+    ctx.font = '600 8px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText('rps', padX + ctx.measureText(`${Math.round(s.r)}`).width + 4, 84);
+
+    // profile progress dots
+    for (let i = 0; i < PROFILES.length; i++) {
+      const dx = padX + i * 9;
+      ctx.fillStyle = (i === st.pi) ? PROFILES[i].color : 'rgba(10,10,12,0.18)';
+      ctx.beginPath();
+      ctx.arc(dx, H - 8, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // right panel — chart
+    const cx0 = leftW + 6;
+    const cy0 = 12;
+    const cw  = W - cx0 - 10;
+    const ch  = H - cy0 - 12;
+    // chart bg
+    ctx.fillStyle = 'rgba(10,10,12,0.02)';
+    roundRect(cx0, cy0, cw, ch, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(10,10,12,0.08)';
+    ctx.lineWidth = 1;
+    roundRect(cx0 + 0.5, cy0 + 0.5, cw - 1, ch - 1, 6);
+    ctx.stroke();
+    // gridlines
+    ctx.strokeStyle = 'rgba(10,10,12,0.04)';
+    for (let i = 1; i < 4; i++) {
+      const yy = cy0 + (ch / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(cx0 + 4, yy);
+      ctx.lineTo(cx0 + cw - 4, yy);
+      ctx.stroke();
+    }
+    // line + fill
+    ctx.beginPath();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = pr.color;
+    for (let i = 0; i < POINTS; i++) {
+      const idx = (head + i) % POINTS;
+      const v = Math.max(0, Math.min(pr.maxR, buf[idx]));
+      const xx = cx0 + 4 + (i / (POINTS - 1)) * (cw - 8);
+      const yy = cy0 + ch - 4 - (v / pr.maxR) * (ch - 8);
+      if (i === 0) ctx.moveTo(xx, yy);
+      else ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+    ctx.lineTo(cx0 + cw - 4, cy0 + ch - 4);
+    ctx.lineTo(cx0 + 4, cy0 + ch - 4);
+    ctx.closePath();
+    const rgb = hexToRgb(pr.color);
+    const g = ctx.createLinearGradient(0, cy0, 0, cy0 + ch);
+    g.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},0.28)`);
+    g.addColorStop(1, `rgba(${rgb.r},${rgb.g},${rgb.b},0.00)`);
+    ctx.fillStyle = g;
+    ctx.fill();
+    // breakpoint marker for STRESS
+    if (pr.name === 'STRESS' && phaseN() === 'run' && prog(now) > 0.65) {
+      const bx = cx0 + 4 + 0.65 * (cw - 8);
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.moveTo(bx, cy0 + 4);
+      ctx.lineTo(bx, cy0 + ch - 4);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})();
+
+/* ---------- 3. OWASP ZAP mini ---------- */
+(() => {
+  const cv = window.__setupCardCanvas && window.__setupCardCanvas('card-canvas-zap');
+  if (!cv) return;
+  const { ctx } = cv;
+  const roundRect = (x,y,w,h,r) => window.__roundRect(ctx,x,y,w,h,r);
+
+  // scan phases
+  const PHASES = [
+    { name: 'IDLE',    label: 'idle',          dur: 600,  color: '#475569' },
+    { name: 'SPIDER',  label: 'spidering',     dur: 1800, color: '#0ea5e9' },
+    { name: 'ACTIVE',  label: 'active scan',   dur: 3500, color: '#f59e0b' },
+    { name: 'REPORT',  label: 'report ready',  dur: 1800, color: '#18a957' }
+  ];
+
+  // findings revealed over time (sorted by severity)
+  const FINDINGS = [
+    { sev: 'HIGH', label: 'SQL Injection · /login',        at: 0.35, color: '#ef4444' },
+    { sev: 'HIGH', label: 'XSS Reflected · /search',       at: 0.55, color: '#ef4444' },
+    { sev: 'MED',  label: 'Missing CSRF · /api/profile',   at: 0.20, color: '#f59e0b' },
+    { sev: 'MED',  label: 'Weak Cipher · TLS 1.0',         at: 0.40, color: '#f59e0b' },
+    { sev: 'MED',  label: 'Open Redirect · /go?u=',        at: 0.70, color: '#f59e0b' },
+    { sev: 'LOW',  label: 'No HSTS header',                at: 0.10, color: '#16c47b' },
+    { sev: 'LOW',  label: 'X-Frame-Options absent',        at: 0.25, color: '#16c47b' },
+    { sev: 'LOW',  label: 'Server header leak',            at: 0.50, color: '#16c47b' }
+  ];
+
+  let pi = 0, t0 = 0, last = 0;
+  let alertIdx = 0; // which finding is shown in the rolling banner
+
+  const advance = (now) => {
+    if (now - t0 < PHASES[pi].dur) return;
+    t0 = now;
+    pi = (pi + 1) % PHASES.length;
+    alertIdx = 0;
+  };
+  const prog = (now) => Math.min(1, Math.max(0, (now - t0) / PHASES[pi].dur));
+
+  const tick = (now) => {
+    if (!last) { last = now; t0 = now; }
+    last = now;
+    advance(now);
+
+    const W = cv.W, H = cv.H;
+    ctx.clearRect(0, 0, W, H);
+    const phase = PHASES[pi];
+
+    // ---- top: target URL bar with scanning state ----
+    const padX = 10;
+    const barY = 8;
+    const barH = 22;
+    // shield icon
+    ctx.fillStyle = phase.color;
+    ctx.beginPath();
+    // shield-ish shape
+    const sx = padX + 10, sy = barY + barH/2;
+    ctx.moveTo(sx, sy - 8);
+    ctx.lineTo(sx + 7, sy - 5);
+    ctx.lineTo(sx + 7, sy + 2);
+    ctx.quadraticCurveTo(sx + 7, sy + 7, sx, sy + 9);
+    ctx.quadraticCurveTo(sx - 7, sy + 7, sx - 7, sy + 2);
+    ctx.lineTo(sx - 7, sy - 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '900 9px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Z', sx, sy);
+
+    // target url bar
+    const urlX = padX + 22;
+    const urlW = W - urlX - padX - 80;
+    ctx.fillStyle = 'rgba(10,10,12,0.05)';
+    roundRect(urlX, barY, urlW, barH, 4);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(10,10,12,0.10)';
+    ctx.lineWidth = 1;
+    roundRect(urlX + 0.5, barY + 0.5, urlW - 1, barH - 1, 4);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(10,10,12,0.78)';
+    ctx.font = '600 9px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('https://staging.app/', urlX + 6, barY + barH/2);
+
+    // status pill on right
+    const pillW = 72;
+    const pillX = W - padX - pillW;
+    const pulsing = (phase.name !== 'IDLE');
+    if (pulsing) { ctx.shadowColor = phase.color; ctx.shadowBlur = 10; }
+    ctx.fillStyle = phase.color;
+    roundRect(pillX, barY, pillW, barH, 4);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    if (pulsing) {
+      const a = 0.55 + 0.45 * Math.sin(now / 220);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(pillX + 9, barY + barH/2, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(phase.name, pillX + pillW/2 + 5, barY + barH/2);
+
+    // ---- middle: progress bar ----
+    const barTrackY = barY + barH + 10;
+    const barTrackH = 6;
+    ctx.fillStyle = 'rgba(10,10,12,0.06)';
+    roundRect(padX, barTrackY, W - padX*2, barTrackH, 3);
+    ctx.fill();
+    // overall progress = sum of (idle+spider+active+report) weighted
+    const totalDur = PHASES.reduce((a, p) => a + p.dur, 0);
+    let elapsed = 0;
+    for (let i = 0; i < pi; i++) elapsed += PHASES[i].dur;
+    elapsed += (now - t0);
+    const overall = Math.min(1, elapsed / totalDur);
+    if (overall > 0) {
+      const g = ctx.createLinearGradient(padX, 0, W - padX, 0);
+      g.addColorStop(0, '#0ea5e9');
+      g.addColorStop(0.5, '#f59e0b');
+      g.addColorStop(1, '#18a957');
+      ctx.fillStyle = g;
+      roundRect(padX, barTrackY, (W - padX*2) * overall, barTrackH, 3);
+      ctx.fill();
+    }
+    // scan progress text
+    ctx.fillStyle = 'rgba(10,10,12,0.55)';
+    ctx.font = '600 8px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${phase.label} · ${Math.round(overall * 100)}%`, padX, barTrackY + barTrackH + 4);
+
+    // ---- bottom: severity counters + rolling alert ----
+    // counts visible up to current progress
+    const visiblePct = elapsed / totalDur;
+    let highC = 0, medC = 0, lowC = 0;
+    for (const f of FINDINGS) {
+      if (visiblePct >= f.at) {
+        if (f.sev === 'HIGH') highC++;
+        else if (f.sev === 'MED') medC++;
+        else lowC++;
+      }
+    }
+    // 3 badges right side
+    const badgeY = H - 24;
+    const badges = [
+      { label: 'HIGH', val: highC, color: '#ef4444' },
+      { label: 'MED',  val: medC,  color: '#f59e0b' },
+      { label: 'LOW',  val: lowC,  color: '#16c47b' }
+    ];
+    ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+    let bx = W - padX;
+    for (let i = badges.length - 1; i >= 0; i--) {
+      const b = badges[i];
+      const valText = String(b.val);
+      const valW = ctx.measureText(valText).width;
+      const labW = ctx.measureText(b.label).width;
+      const tot = labW + 8 + valW + 14;
+      bx -= tot;
+      // dot
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.arc(bx + 4, badgeY + 8, 3, 0, Math.PI * 2);
+      ctx.fill();
+      // label
+      ctx.fillStyle = 'rgba(10,10,12,0.55)';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(b.label, bx + 10, badgeY + 8);
+      // val
+      ctx.fillStyle = b.val > 0 ? b.color : 'rgba(10,10,12,0.30)';
+      ctx.font = '900 11px ui-monospace, "JetBrains Mono", monospace';
+      ctx.fillText(valText, bx + 10 + labW + 4, badgeY + 8);
+      ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+      bx -= 4;
+    }
+
+    // rolling alert message left side
+    const alerts = FINDINGS.filter(f => visiblePct >= f.at);
+    if (alerts.length) {
+      // cycle through revealed alerts every 900ms
+      const ai = Math.floor(now / 900) % alerts.length;
+      const a = alerts[ai];
+      ctx.fillStyle = a.color;
+      ctx.beginPath();
+      ctx.arc(padX + 3, badgeY + 8, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = a.color;
+      ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(a.sev, padX + 10, badgeY + 8);
+      const sevW = ctx.measureText(a.sev).width;
+      ctx.fillStyle = 'rgba(10,10,12,0.75)';
+      ctx.font = '600 8px ui-monospace, "JetBrains Mono", monospace';
+      let msg = a.label;
+      const maxW = bx - (padX + 14 + sevW + 4);
+      while (ctx.measureText(msg).width > maxW && msg.length) msg = msg.slice(0, -1);
+      if (msg !== a.label) msg = msg.slice(0, -1) + '…';
+      ctx.fillText(msg, padX + 14 + sevW, badgeY + 8);
+    } else {
+      ctx.fillStyle = 'rgba(10,10,12,0.40)';
+      ctx.font = '600 8px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('— no findings yet —', padX, badgeY + 8);
+    }
+
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})();
+

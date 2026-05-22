@@ -155,14 +155,22 @@ body.loading { overflow: hidden; }
 #work { overflow: hidden; padding-top: clamp(180px, 20vh, 240px); }
 #work .container { position: relative; z-index: 1; }
 #work .section-head { margin-top: 24px; }
-.stack-canvas { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 1; }
-#stack { overflow: hidden; padding-top: clamp(180px, 20vh, 240px); position: relative; }
-#stack .container { position: relative; z-index: 1; }
-#stack .section-head { margin-top: 24px; }
-.journey-canvas { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 1; }
-#journey { overflow: hidden; padding-top: clamp(240px, 26vh, 300px); position: relative; }
-#journey .container { position: relative; z-index: 1; }
-#journey .section-head { margin-top: 24px; }
+.stack-canvas, .journey-canvas { display: none; }
+#stack { padding-top: clamp(72px, 10vh, 110px); }
+#journey { padding-top: clamp(72px, 10vh, 110px); }
+
+/* Bento card mini-preview canvases */
+.bento-card.has-preview { display: flex; flex-direction: column; }
+.bento-card.has-preview .chips { margin-bottom: 12px; }
+.card-canvas {
+  display: block;
+  width: 100%;
+  height: 130px;
+  margin-top: auto;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(10,10,12,0.02), rgba(10,10,12,0.04));
+  border: 1px solid rgba(10,10,12,0.06);
+}
 .bg-noise {
   position: fixed; inset: 0; z-index: 1;
   pointer-events: none;
