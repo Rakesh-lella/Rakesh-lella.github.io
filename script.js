@@ -351,8 +351,10 @@
     }, { passive: true });
     window.addEventListener('pointerleave', () => { mx = -9999; my = -9999; });
     window.addEventListener('pointerdown', (e) => {
+      const unitX = gates.length ? gates[0].x : 0;
       for (const b of bugs) {
         if (b.state !== 'crawling') continue;
+        if (b.x < unitX) continue;     // QA can't reach pre-UNIT bugs (devs' territory)
         const dx = b.x - e.clientX, dy = b.y - e.clientY;
         if (dx*dx + dy*dy < 110*110) killBug(b, 'squash', null, 'qa');
       }
@@ -729,12 +731,14 @@
       ctx.fillStyle = '#ffffff';
       ctx.fillText('▶ PROD', prodX - ptw / 2, 90);
 
-      // ---- sentinels: aim at closest crawling bug, fire if cooldown elapsed ----
+      // ---- sentinels: aim at closest crawling bug (post-UNIT only), fire if cooldown elapsed ----
+      const unitX = gates.length ? gates[0].x : 0;
       for (const s of sentinels) {
-        // find closest bug
+        // find closest bug past UNIT line
         let target = null, bestD = 1e9;
         for (const b of bugs) {
           if (b.state !== 'crawling') continue;
+          if (b.x < unitX) continue;            // QA can't shoot pre-UNIT bugs
           if (b.x > prodX - 8) continue;
           const dx = b.x - s.x, dy = b.y - s.y;
           const d = dx*dx + dy*dy;
@@ -784,8 +788,35 @@
           b.y += b.vy + w2;
           b.vy += ((h * 0.55 - b.y) * 0.00002);
 
+          // dev pre-UNIT zone: small per-frame chance the nearest dev swats this bug
+          // (~5% overall kill rate before the UNIT line)
+          if (b.x < unitX && Math.random() < 0.0009) {
+            // flash nearest dev's screen + tiny blue spark trail from dev to bug
+            let bestDev = null, bestDD = 1e9;
+            for (const d of devs) {
+              const dd = (d.x - b.x) ** 2 + (d.y - b.y) ** 2;
+              if (dd < bestDD) { bestDD = dd; bestDev = d; }
+            }
+            if (bestDev) {
+              bestDev.screenGlow = now;
+              // small dev-swat "thrown" sparks from monitor to bug
+              for (let k = 0; k < 8; k++) {
+                confetti.push({
+                  x: bestDev.x + 14, y: bestDev.y,
+                  vx: ((b.x - bestDev.x) / 40) + (Math.random() - 0.5) * 1.4,
+                  vy: ((b.y - bestDev.y) / 40) + (Math.random() - 0.5) * 1.4,
+                  t0: now, life: 420,
+                  color: '#0ea5e9', size: 1.6
+                });
+              }
+            }
+            killBug(b, 'dev-swat', '#0ea5e9', 'dev');
+            continue;
+          }
+
           // cursor squash (counts as QA — you, the QA engineer, did it)
-          if (mx > -9000) {
+          // QA can only act on bugs that have crossed the UNIT line
+          if (mx > -9000 && b.x >= unitX) {
             const dx = b.x - mx, dy = b.y - my;
             if (dx*dx + dy*dy < SQUASH_R * SQUASH_R) killBug(b, 'squash', null, 'qa');
           }
