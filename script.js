@@ -213,11 +213,605 @@
     });
   })();
 
-  // ===== Shift-Left Defense Line (flagship, QA-themed background) =====
-  // Bugs spawn at the edges and crawl toward a "PROD" line on the right.
-  // QA gates auto-zap some, the cursor squashes the rest with a green ✓ burst.
-  // Any leaker that reaches PROD triggers a red ✗ flash (caught in prod = bad).
+  // ===== Cute Bug Zoo vs QA Sentinels (flagship, QA-themed background) =====
+  // 4 colorful bug species (ladybug/bee/caterpillar/butterfly) spawn at edges
+  // and crawl toward the PROD line. Two test gates ⚡zap some; QA sentinels
+  // stationed in front of PROD aim & fire colored lasers at the closest bug.
+  // Kills explode in confetti. Cursor can still squash on hover/click.
   (() => {
+    const c = $('#bg-canvas');
+    if (!c || prefersReduced) return;
+    const ctx = c.getContext('2d');
+    let w, h, dpr;
+
+    // ---- palettes ----
+    const ACCENT = '24, 169, 87';
+    const FAIL   = '255, 90, 54';
+    const INK    = '10, 10, 12';
+    const SPECIES = {
+      ladybug:    { primary: '#ef4444', secondary: '#0a0a0c', accent: '#fff1f1', size: 7,   speed: [0.30, 0.55] },
+      bee:        { primary: '#fbbf24', secondary: '#0a0a0c', accent: '#fff7d1', size: 6.5, speed: [0.55, 0.95] },
+      caterpillar:{ primary: '#22c55e', secondary: '#15803d', accent: '#bbf7d0', size: 5.5, speed: [0.25, 0.45] },
+      butterfly:  { primary: '#a855f7', secondary: '#ec4899', accent: '#fce7f3', size: 7.5, speed: [0.45, 0.80] }
+    };
+    const SPECIES_KEYS = Object.keys(SPECIES);
+
+    const bugs = [];
+    const lasers = [];        // {x1,y1,x2,y2,t0,life,color}
+    const confetti = [];      // {x,y,vx,vy,life,t0,color,size}
+    const trail = [];
+    const sentinels = [];
+
+    const MAX_BUGS = 10;
+    const SQUASH_R = 70;
+    const PROD_X_FRAC = 0.93;
+    let prodFlashT = 0;
+    let killCount = 0;
+    let leakCount = 0;
+
+    let mx = -9999, my = -9999;
+    let mLast = { x: 0, y: 0, t: 0 };
+
+    // gates with electric arc spark schedule
+    let gates = [];
+
+    const resize = () => {
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      const W = innerWidth, H = innerHeight;
+      c.width = W * dpr; c.height = H * dpr;
+      c.style.width = W + 'px'; c.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      w = W; h = H;
+      gates = [
+        { x: W * 0.42, label: 'UNIT', p: 0.35, lastArc: 0 },
+        { x: W * 0.68, label: 'E2E',  p: 0.45, lastArc: 0 }
+      ];
+      // 3 sentinels along PROD line (positioned just left of PROD line)
+      const prodX = W * PROD_X_FRAC;
+      sentinels.length = 0;
+      const sentY = [H * 0.28, H * 0.55, H * 0.80];
+      const sentColor = ['#0ea5e9', '#18a957', '#f97316'];
+      for (let i = 0; i < 3; i++) {
+        sentinels.push({
+          x: prodX - 26, y: sentY[i],
+          color: sentColor[i], aim: Math.PI,
+          lastFire: 0, charge: 0
+        });
+      }
+    };
+
+    const spawnBug = () => {
+      if (bugs.length >= MAX_BUGS) return;
+      const speciesKey = SPECIES_KEYS[(Math.random() * SPECIES_KEYS.length) | 0];
+      const sp = SPECIES[speciesKey];
+      const side = Math.random();
+      let x, y;
+      if (side < 0.75) { x = -25; y = 80 + Math.random() * (h - 160); }
+      else if (side < 0.88) { x = Math.random() * w * 0.35; y = -25; }
+      else { x = Math.random() * w * 0.35; y = h + 25; }
+      bugs.push({
+        species: speciesKey,
+        x, y,
+        vx: sp.speed[0] + Math.random() * (sp.speed[1] - sp.speed[0]),
+        vy: (Math.random() - 0.5) * 0.18,
+        phase: Math.random() * Math.PI * 2,
+        wiggleAmp: 0.4 + Math.random() * 0.7,
+        size: sp.size * (0.85 + Math.random() * 0.35),
+        flapPhase: Math.random() * Math.PI * 2,
+        state: 'crawling',
+        dieT: 0,
+        passedGates: new Set(),
+        targeted: false
+      });
+    };
+
+    const spawnLoop = () => {
+      spawnBug();
+      setTimeout(spawnLoop, 800 + Math.random() * 1400);
+    };
+    setTimeout(spawnLoop, 600);
+
+    window.addEventListener('pointermove', (e) => {
+      mx = e.clientX; my = e.clientY;
+      const now = performance.now();
+      if (now - mLast.t > 16) {
+        trail.push({ x: mx, y: my, t: now });
+        if (trail.length > 18) trail.shift();
+        mLast = { x: mx, y: my, t: now };
+      }
+    }, { passive: true });
+    window.addEventListener('pointerleave', () => { mx = -9999; my = -9999; });
+    window.addEventListener('pointerdown', (e) => {
+      for (const b of bugs) {
+        if (b.state !== 'crawling') continue;
+        const dx = b.x - e.clientX, dy = b.y - e.clientY;
+        if (dx*dx + dy*dy < 110*110) killBug(b, 'squash');
+      }
+    });
+
+    const killBug = (b, mode, color) => {
+      if (b.state !== 'crawling') return;
+      b.state = 'dying';
+      b.dieT = performance.now();
+      b.killMode = mode;
+      const sp = SPECIES[b.species];
+      const palette = [sp.primary, sp.secondary, sp.accent, color || sp.primary];
+      const n = mode === 'leak' ? 18 : 14;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const s = 1.0 + Math.random() * 2.6;
+        confetti.push({
+          x: b.x, y: b.y,
+          vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.8,
+          t0: performance.now(),
+          life: 600 + Math.random() * 380,
+          color: palette[(Math.random() * palette.length) | 0],
+          size: 1.4 + Math.random() * 2.2,
+          rot: Math.random() * Math.PI * 2,
+          vr: (Math.random() - 0.5) * 0.3
+        });
+      }
+      if (mode === 'leak') { prodFlashT = performance.now(); leakCount++; }
+      else { killCount++; }
+    };
+
+    // ---- bug drawers ----
+    const drawLadybug = (b, now) => {
+      const sp = SPECIES.ladybug;
+      const s = b.size;
+      const legPhase = now / 70 + b.phase;
+      ctx.save(); ctx.translate(b.x, b.y);
+      // legs
+      ctx.strokeStyle = sp.secondary; ctx.lineWidth = 1; ctx.lineCap = 'round';
+      for (let i = -1; i <= 1; i++) {
+        const off = i * s * 0.45;
+        const sw = Math.sin(legPhase + i * 1.3) * s * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(off, -s * 0.3); ctx.lineTo(off + sw * 0.3, -s * 1.1); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(off,  s * 0.3); ctx.lineTo(off - sw * 0.3,  s * 1.1); ctx.stroke();
+      }
+      // body dome
+      ctx.fillStyle = sp.primary;
+      ctx.beginPath(); ctx.ellipse(0, 0, s * 1.4, s * 1.05, 0, 0, Math.PI * 2); ctx.fill();
+      // center line
+      ctx.strokeStyle = sp.secondary; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(-s * 1.0, 0); ctx.lineTo(s * 0.9, 0); ctx.stroke();
+      // spots
+      ctx.fillStyle = sp.secondary;
+      [[-0.5, -0.45], [-0.5, 0.45], [0.3, -0.45], [0.3, 0.45]].forEach(([x, y]) => {
+        ctx.beginPath(); ctx.arc(x * s, y * s, s * 0.22, 0, Math.PI * 2); ctx.fill();
+      });
+      // head
+      ctx.fillStyle = sp.secondary;
+      ctx.beginPath(); ctx.arc(s * 1.25, 0, s * 0.55, 0, Math.PI * 2); ctx.fill();
+      // shine
+      ctx.fillStyle = sp.accent;
+      ctx.beginPath(); ctx.arc(-s * 0.5, -s * 0.55, s * 0.18, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    };
+
+    const drawBee = (b, now) => {
+      const sp = SPECIES.bee;
+      const s = b.size;
+      const legPhase = now / 60 + b.phase;
+      const wingPhase = now / 30 + b.flapPhase;
+      ctx.save(); ctx.translate(b.x, b.y);
+      // legs (small)
+      ctx.strokeStyle = sp.secondary; ctx.lineWidth = 0.9; ctx.lineCap = 'round';
+      for (let i = -1; i <= 1; i++) {
+        const off = i * s * 0.4;
+        const sw = Math.sin(legPhase + i) * s * 0.3;
+        ctx.beginPath(); ctx.moveTo(off, -s * 0.35); ctx.lineTo(off + sw * 0.2, -s * 0.95); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(off,  s * 0.35); ctx.lineTo(off - sw * 0.2,  s * 0.95); ctx.stroke();
+      }
+      // wings (flapping)
+      const wingY = Math.abs(Math.sin(wingPhase)) * s * 0.4 + s * 0.4;
+      ctx.fillStyle = 'rgba(180, 220, 255, 0.55)';
+      ctx.beginPath(); ctx.ellipse(-s * 0.1, -wingY, s * 0.7, s * 0.4, -0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(-s * 0.1,  wingY, s * 0.7, s * 0.4,  0.3, 0, Math.PI * 2); ctx.fill();
+      // body
+      ctx.fillStyle = sp.primary;
+      ctx.beginPath(); ctx.ellipse(0, 0, s * 1.3, s * 0.85, 0, 0, Math.PI * 2); ctx.fill();
+      // stripes
+      ctx.fillStyle = sp.secondary;
+      for (const sx of [-0.4, 0.2]) {
+        ctx.beginPath();
+        ctx.ellipse(sx * s, 0, s * 0.18, s * 0.85, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // head
+      ctx.fillStyle = sp.secondary;
+      ctx.beginPath(); ctx.arc(s * 1.15, 0, s * 0.5, 0, Math.PI * 2); ctx.fill();
+      // eye
+      ctx.fillStyle = sp.accent;
+      ctx.beginPath(); ctx.arc(s * 1.3, -s * 0.15, s * 0.12, 0, Math.PI * 2); ctx.fill();
+      // stinger
+      ctx.fillStyle = sp.secondary;
+      ctx.beginPath();
+      ctx.moveTo(-s * 1.3, 0); ctx.lineTo(-s * 1.7, -s * 0.15); ctx.lineTo(-s * 1.7, s * 0.15);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    };
+
+    const drawCaterpillar = (b, now) => {
+      const sp = SPECIES.caterpillar;
+      const s = b.size;
+      const wave = now / 140 + b.phase;
+      ctx.save(); ctx.translate(b.x, b.y);
+      // 5 segments along motion (backward)
+      for (let i = 4; i >= 0; i--) {
+        const seg = i * s * 1.05;
+        const yOff = Math.sin(wave + i * 0.7) * s * 0.35;
+        ctx.fillStyle = i % 2 === 0 ? sp.primary : sp.secondary;
+        ctx.beginPath(); ctx.arc(-seg, yOff, s * 0.75, 0, Math.PI * 2); ctx.fill();
+        // legs underneath
+        if (i > 0) {
+          ctx.strokeStyle = sp.secondary; ctx.lineWidth = 0.9; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(-seg, yOff + s * 0.6); ctx.lineTo(-seg, yOff + s * 1.1); ctx.stroke();
+        }
+      }
+      // head (front)
+      ctx.fillStyle = sp.primary;
+      ctx.beginPath(); ctx.arc(s * 0.4, Math.sin(wave) * s * 0.2, s * 0.95, 0, Math.PI * 2); ctx.fill();
+      // eyes
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(s * 0.8, -s * 0.25, s * 0.18, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(s * 0.8,  s * 0.05, s * 0.18, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = INK;
+      ctx.beginPath(); ctx.arc(s * 0.88, -s * 0.25, s * 0.08, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(s * 0.88,  s * 0.05, s * 0.08, 0, Math.PI * 2); ctx.fill();
+      // antennae
+      ctx.strokeStyle = sp.secondary; ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.moveTo(s * 0.7, -s * 0.7); ctx.lineTo(s * 1.0, -s * 1.15); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(s * 0.7,  s * 0.5); ctx.lineTo(s * 1.0,  s * 1.05); ctx.stroke();
+      ctx.restore();
+    };
+
+    const drawButterfly = (b, now) => {
+      const sp = SPECIES.butterfly;
+      const s = b.size;
+      const flap = Math.sin(now / 90 + b.flapPhase);   // -1..1
+      ctx.save(); ctx.translate(b.x, b.y);
+      // wings
+      const wScale = 0.5 + Math.abs(flap) * 0.7;
+      ctx.fillStyle = sp.primary;
+      ctx.beginPath();
+      ctx.ellipse(-s * 0.2, -s * 0.7 * wScale, s * 0.95, s * 1.05 * wScale, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(-s * 0.2,  s * 0.7 * wScale, s * 0.95, s * 1.05 * wScale,  0.5, 0, Math.PI * 2);
+      ctx.fill();
+      // lower wing
+      ctx.fillStyle = sp.secondary;
+      ctx.beginPath();
+      ctx.ellipse(-s * 0.6, -s * 0.55 * wScale, s * 0.55, s * 0.7 * wScale, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(-s * 0.6,  s * 0.55 * wScale, s * 0.55, s * 0.7 * wScale,  0.5, 0, Math.PI * 2);
+      ctx.fill();
+      // wing dots
+      ctx.fillStyle = sp.accent;
+      ctx.beginPath(); ctx.arc(s * 0.1, -s * 0.7 * wScale, s * 0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(s * 0.1,  s * 0.7 * wScale, s * 0.2, 0, Math.PI * 2); ctx.fill();
+      // body
+      ctx.fillStyle = INK;
+      ctx.beginPath(); ctx.ellipse(0, 0, s * 1.2, s * 0.28, 0, 0, Math.PI * 2); ctx.fill();
+      // head
+      ctx.beginPath(); ctx.arc(s * 1.2, 0, s * 0.35, 0, Math.PI * 2); ctx.fill();
+      // antennae
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(s * 1.4, -s * 0.2); ctx.lineTo(s * 1.85, -s * 0.7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(s * 1.4,  s * 0.2); ctx.lineTo(s * 1.85,  s * 0.7); ctx.stroke();
+      ctx.restore();
+    };
+
+    const DRAWERS = {
+      ladybug: drawLadybug, bee: drawBee,
+      caterpillar: drawCaterpillar, butterfly: drawButterfly
+    };
+
+    // QA sentinel (cute little operator with laser gun)
+    const drawSentinel = (s, now) => {
+      const x = s.x, y = s.y;
+      const charging = s.charge > 0;
+      ctx.save();
+      // base shadow
+      ctx.fillStyle = 'rgba(10,10,12,0.10)';
+      ctx.beginPath(); ctx.ellipse(x, y + 18, 14, 3, 0, 0, Math.PI * 2); ctx.fill();
+      // body (rounded)
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.roundRect(x - 7, y - 4, 14, 18, 4);
+      ctx.fill();
+      // head
+      ctx.fillStyle = '#fef3c7';
+      ctx.beginPath(); ctx.arc(x, y - 10, 7, 0, Math.PI * 2); ctx.fill();
+      // QA cap
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.arc(x, y - 13, 7, Math.PI, 0); ctx.fill();
+      ctx.fillRect(x - 7, y - 13, 14, 2);
+      // visor / "Q" badge
+      ctx.fillStyle = INK;
+      ctx.font = '700 6px ui-monospace, "JetBrains Mono", monospace';
+      ctx.fillText('QA', x - 5, y - 11);
+      // eyes
+      ctx.fillStyle = INK;
+      ctx.beginPath(); ctx.arc(x - 2.2, y - 9, 0.9, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 2.2, y - 9, 0.9, 0, Math.PI * 2); ctx.fill();
+      // laser gun (rotates with aim)
+      ctx.save();
+      ctx.translate(x, y + 2);
+      ctx.rotate(s.aim);
+      ctx.fillStyle = '#1f2937';
+      ctx.beginPath(); ctx.roundRect(0, -2.2, 14, 4.4, 2); ctx.fill();
+      // muzzle glow
+      const glowA = charging ? Math.min(1, s.charge / 200) : 0;
+      if (glowA > 0) {
+        ctx.fillStyle = `rgba(${ACCENT}, ${glowA})`;
+        ctx.beginPath(); ctx.arc(15, 0, 3 + glowA * 2, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+      ctx.restore();
+    };
+
+    const drawCheck = (x, y, sz, alpha) => {
+      ctx.strokeStyle = `rgba(${ACCENT}, ${alpha})`;
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x - sz, y);
+      ctx.lineTo(x - sz * 0.25, y + sz * 0.75);
+      ctx.lineTo(x + sz, y - sz * 0.65);
+      ctx.stroke();
+    };
+
+    // ---- main loop ----
+    const tick = () => {
+      const now = performance.now();
+      ctx.clearRect(0, 0, w, h);
+
+      const prodX = w * PROD_X_FRAC;
+
+      // ---- gates ----
+      ctx.setLineDash([4, 6]);
+      for (const g of gates) {
+        ctx.strokeStyle = `rgba(${INK}, 0.14)`;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(g.x, 50); ctx.lineTo(g.x, h - 50); ctx.stroke();
+        ctx.fillStyle = `rgba(${INK}, 0.4)`;
+        ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
+        ctx.fillText(g.label, g.x - 10, 38);
+      }
+      ctx.setLineDash([]);
+
+      // ---- PROD line ----
+      const prodFade = Math.max(0, 1 - (now - prodFlashT) / 700);
+      const prodCol = prodFade > 0 ? FAIL : ACCENT;
+      ctx.strokeStyle = `rgba(${prodCol}, ${0.4 + prodFade * 0.5})`;
+      ctx.lineWidth = 1.8 + prodFade * 2;
+      ctx.beginPath(); ctx.moveTo(prodX, 20); ctx.lineTo(prodX, h - 20); ctx.stroke();
+      ctx.save();
+      ctx.translate(prodX + 12, 60);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = `rgba(${prodCol}, ${0.7 + prodFade * 0.3})`;
+      ctx.font = '700 10px ui-monospace, "JetBrains Mono", monospace';
+      ctx.fillText('▶ PROD', 0, 0);
+      ctx.restore();
+
+      // ---- sentinels: aim at closest crawling bug, fire if cooldown elapsed ----
+      for (const s of sentinels) {
+        // find closest bug
+        let target = null, bestD = 1e9;
+        for (const b of bugs) {
+          if (b.state !== 'crawling') continue;
+          if (b.x > prodX - 8) continue;
+          const dx = b.x - s.x, dy = b.y - s.y;
+          const d = dx*dx + dy*dy;
+          if (d < bestD && d < 380 * 380) { bestD = d; target = b; }
+        }
+        if (target) {
+          const desired = Math.atan2(target.y - s.y, target.x - s.x);
+          // smooth aim toward target
+          let diff = desired - s.aim;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          s.aim += diff * 0.18;
+          // charge then fire
+          if (now - s.lastFire > 1100) {
+            s.charge += 16;
+            if (s.charge > 240 && Math.abs(diff) < 0.15) {
+              // fire
+              const muzzleX = s.x + Math.cos(s.aim) * 16;
+              const muzzleY = (s.y + 2) + Math.sin(s.aim) * 16;
+              lasers.push({
+                x1: muzzleX, y1: muzzleY,
+                x2: target.x, y2: target.y,
+                t0: now, life: 180, color: s.color
+              });
+              killBug(target, 'laser', s.color);
+              s.lastFire = now;
+              s.charge = 0;
+            }
+          }
+        } else {
+          // idle: slowly aim leftward
+          let diff = Math.PI - s.aim;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          s.aim += diff * 0.04;
+          s.charge = Math.max(0, s.charge - 8);
+        }
+        drawSentinel(s, now);
+      }
+
+      // ---- update + draw bugs ----
+      for (let i = bugs.length - 1; i >= 0; i--) {
+        const b = bugs[i];
+        if (b.state === 'crawling') {
+          const w2 = Math.sin(now / 230 + b.phase) * b.wiggleAmp * 0.4;
+          b.x += b.vx;
+          b.y += b.vy + w2;
+          b.vy += ((h * 0.55 - b.y) * 0.00002);
+
+          // cursor squash
+          if (mx > -9000) {
+            const dx = b.x - mx, dy = b.y - my;
+            if (dx*dx + dy*dy < SQUASH_R * SQUASH_R) killBug(b, 'squash');
+          }
+
+          // gates: occasional ⚡ zap
+          for (const g of gates) {
+            if (b.state !== 'crawling') break;
+            if (!b.passedGates.has(g.label) && b.x >= g.x && b.x <= g.x + b.vx + 1) {
+              b.passedGates.add(g.label);
+              if (Math.random() < g.p) {
+                // electric arc spark
+                for (let k = 0; k < 6; k++) {
+                  confetti.push({
+                    x: g.x, y: b.y,
+                    vx: (Math.random() - 0.5) * 3,
+                    vy: (Math.random() - 0.5) * 3,
+                    t0: now, life: 350,
+                    color: '#0ea5e9', size: 1.6
+                  });
+                }
+                killBug(b, 'zap', '#0ea5e9');
+              }
+            }
+          }
+
+          // reached prod = leak
+          if (b.state === 'crawling' && b.x >= prodX) {
+            b.x = prodX;
+            killBug(b, 'leak');
+          }
+
+          // render
+          DRAWERS[b.species](b, now);
+        } else if (b.state === 'dying') {
+          const age = now - b.dieT;
+          if (age > 600) { bugs.splice(i, 1); continue; }
+          const fade = 1 - age / 600;
+          if (b.killMode === 'leak') {
+            ctx.strokeStyle = `rgba(${FAIL}, ${fade})`;
+            ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+            const s = 7;
+            ctx.beginPath();
+            ctx.moveTo(b.x - s, b.y - s); ctx.lineTo(b.x + s, b.y + s);
+            ctx.moveTo(b.x + s, b.y - s); ctx.lineTo(b.x - s, b.y + s);
+            ctx.stroke();
+          } else {
+            drawCheck(b.x, b.y, 7, fade);
+          }
+        }
+      }
+
+      // ---- lasers ----
+      for (let i = lasers.length - 1; i >= 0; i--) {
+        const L = lasers[i];
+        const age = now - L.t0;
+        if (age > L.life) { lasers.splice(i, 1); continue; }
+        const a = 1 - age / L.life;
+        // outer glow
+        ctx.strokeStyle = L.color + '40';
+        ctx.lineWidth = 6 * a + 2;
+        ctx.beginPath(); ctx.moveTo(L.x1, L.y1); ctx.lineTo(L.x2, L.y2); ctx.stroke();
+        // core
+        ctx.strokeStyle = L.color;
+        ctx.lineWidth = 1.6 * a + 0.6;
+        ctx.beginPath(); ctx.moveTo(L.x1, L.y1); ctx.lineTo(L.x2, L.y2); ctx.stroke();
+      }
+
+      // ---- confetti ----
+      for (let i = confetti.length - 1; i >= 0; i--) {
+        const p = confetti[i];
+        const age = now - p.t0;
+        if (age > p.life) { confetti.splice(i, 1); continue; }
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.06;
+        p.vx *= 0.99;
+        p.rot = (p.rot || 0) + (p.vr || 0);
+        const a = 1 - age / p.life;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot || 0);
+        ctx.globalAlpha = a;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+
+      // ---- cursor halo + squash ring when hostile ----
+      if (mx > -9000) {
+        let hostile = false;
+        for (const b of bugs) {
+          if (b.state !== 'crawling') continue;
+          const dx = b.x - mx, dy = b.y - my;
+          if (dx*dx + dy*dy < (SQUASH_R + 30) * (SQUASH_R + 30)) { hostile = true; break; }
+        }
+        const col = hostile ? ACCENT : INK;
+        const g = ctx.createRadialGradient(mx, my, 0, mx, my, 90);
+        g.addColorStop(0, `rgba(${col}, ${hostile ? 0.18 : 0.05})`);
+        g.addColorStop(1, `rgba(${col}, 0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(mx - 90, my - 90, 180, 180);
+        if (hostile) {
+          ctx.strokeStyle = `rgba(${ACCENT}, 0.5)`;
+          ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+          ctx.beginPath(); ctx.arc(mx, my, SQUASH_R, 0, Math.PI * 2); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+
+      // ---- cursor trace ----
+      if (trail.length > 1) {
+        while (trail.length && now - trail[0].t > 360) trail.shift();
+        ctx.setLineDash([3, 4]);
+        for (let i = 1; i < trail.length; i++) {
+          const a = trail[i - 1], bb = trail[i];
+          const k = i / trail.length;
+          ctx.strokeStyle = `rgba(${ACCENT}, ${0.04 + k * 0.16})`;
+          ctx.lineWidth = 0.5 + k * 1.1;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(bb.x, bb.y); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+
+      // ---- HUD ----
+      ctx.fillStyle = `rgba(${INK}, 0.40)`;
+      ctx.font = '600 10px ui-monospace, "JetBrains Mono", monospace';
+      ctx.fillText(`bugs squashed: ${killCount}`, 20, h - 30);
+      ctx.fillStyle = `rgba(${FAIL}, ${leakCount > 0 ? 0.65 : 0.35})`;
+      ctx.fillText(`leaked to prod: ${leakCount}`, 20, h - 16);
+
+      requestAnimationFrame(tick);
+    };
+
+    // Polyfill roundRect for older Chromium just in case
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+        if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
+        this.beginPath();
+        this.moveTo(x + r, y);
+        this.arcTo(x + w, y, x + w, y + h, r);
+        this.arcTo(x + w, y + h, x, y + h, r);
+        this.arcTo(x, y + h, x, y, r);
+        this.arcTo(x, y, x + w, y, r);
+        this.closePath();
+        return this;
+      };
+    }
+
+    resize();
+    window.addEventListener('resize', resize);
+    tick();
+  })();
+
+  // ===== _OLD_SHIFT_LEFT_REMOVED =====
+  if (false) (() => {
     const c = $('#bg-canvas');
     if (!c || prefersReduced) return;
     const ctx = c.getContext('2d');
