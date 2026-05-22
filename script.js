@@ -3041,16 +3041,18 @@
       packet.t += (dt / 1000) * PACKET_SPEED;
       if (packet.t >= 1) {
         packet.t = 1;
+        // packet has arrived at station i+1 — advance and dwell there
+        packet.i += 1;
         packet.phase = 'dwell';
         packet.dwellStart = now;
       }
     } else if (packet.phase === 'dwell') {
       if (now - packet.dwellStart > DWELL) {
-        packet.i += 1;
         if (packet.i >= STAGES.length - 1) {
           packet.phase = 'restart';
           packet.restartAt = now + PAUSE_AFTER_LOOP;
         } else {
+          // body anim at station i is fully complete → now travel toward i+1
           packet.phase = 'travel';
           packet.t = 0;
         }
@@ -3068,10 +3070,11 @@
 
     // draw all stations
     for (let i = 0; i < STAGES.length; i++) {
+      // station is "active" (fully drawn) once the packet has reached it
+      // and stays active while dwelling AND while traveling on to the next.
       const active =
-        i < packet.i ||
-        (i === packet.i && (packet.phase === 'dwell' || packet.phase === 'restart')) ||
-        (packet.phase === 'restart' && i === STAGES.length - 1);
+        (packet.phase === 'restart') ||
+        (i <= packet.i);
       const glow = (i === packet.i && packet.phase === 'dwell')
         ? Math.max(0, 1 - (now - packet.dwellStart) / DWELL)
         : 0;
