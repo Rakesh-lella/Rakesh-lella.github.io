@@ -3372,11 +3372,14 @@
   requestAnimationFrame(tick);
 })();
 
+
 /* =========================================================
-   JOURNEY SECTION BACKGROUND — Locust load-test dashboard
-   Live ramp-up of users, RPS line chart climbing, per-endpoint
-   request bars, failure counts. Cycles: idle → spawn → load
-   → cooldown → reset.
+   JOURNEY SECTION BACKGROUND — Locust performance dashboard
+   Cycles through five perf-test profiles in order:
+     LOAD · SPIKE · STRESS · SOAK · STEP
+   Each profile drives its own users(t) and rps(t) curve, so the
+   chart shape changes every cycle. Header banner shows the
+   profile name + a one-line description.
    ========================================================= */
 (() => {
   const c = document.getElementById('journey-canvas');
@@ -3396,7 +3399,6 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // ---- helpers ----
   const roundRect = (x, y, w, h, r) => {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -3407,97 +3409,147 @@
     ctx.closePath();
   };
 
-  // ---- config / state ----
-  const MAX_USERS = 100;
+  // ---- per-endpoint config ----
   const ENDPOINTS = [
     { method: 'GET',  path: '/api/users',    color: '#18a957', weight: 0.45 },
     { method: 'POST', path: '/api/login',    color: '#6d3df1', weight: 0.30 },
     { method: 'GET',  path: '/api/products', color: '#0ea5e9', weight: 0.25 }
   ];
 
-  const PHASES = [
-    { name: 'idle',     dur: 1100 },
-    { name: 'spawn',    dur: 3000 },
-    { name: 'load',     dur: 6000 },
-    { name: 'cooldown', dur: 1600 },
-    { name: 'reset',    dur: 600  }
+  // ---- test PROFILES ----
+  // p = progress in run-phase 0..1
+  // returns { users, rps, failRate? }  failRate is added on top of base 0.01
+  const PROFILES = [
+    {
+      name: 'LOAD',  title: 'Load test',
+      desc: 'gradual ramp · sustain at target',
+      color: '#16c47b',
+      maxUsers: 100, maxRps: 500,
+      curve: (p) => {
+        // ramp 0..0.35, sustain 0.35..1
+        const u = p < 0.35 ? (p / 0.35) * 100 : 100;
+        const r = p < 0.35 ? (p / 0.35) * 460 : 460 + Math.sin(p * 18) * 16;
+        return { users: u, rps: r, failRate: 0 };
+      }
+    },
+    {
+      name: 'SPIKE', title: 'Spike test',
+      desc: 'sudden burst · then drop',
+      color: '#ef4444',
+      maxUsers: 250, maxRps: 950,
+      curve: (p) => {
+        // small steady 0..0.25, burst 0.25..0.40, hold 0.40..0.80, drop 0.80..1
+        let u, r;
+        if (p < 0.25) { u = (p / 0.25) * 40; r = (p / 0.25) * 180; }
+        else if (p < 0.40) { const k = (p - 0.25) / 0.15; u = 40 + k * 210; r = 180 + k * 760; }
+        else if (p < 0.80) { u = 250; r = 920 + Math.sin(p * 30) * 18; }
+        else { const k = 1 - (p - 0.80) / 0.20; u = 250 * k; r = 920 * k; }
+        // brief failure burst at peak
+        const fr = (p > 0.32 && p < 0.55) ? 0.07 : 0;
+        return { users: u, rps: r, failRate: fr };
+      }
+    },
+    {
+      name: 'STRESS', title: 'Stress test',
+      desc: 'push past capacity · find break point',
+      color: '#f59e0b',
+      maxUsers: 300, maxRps: 750,
+      curve: (p) => {
+        // climb users linearly, but rps degrades after breakpoint at 0.65
+        const u = Math.min(300, p * 320);
+        let r;
+        if (p < 0.65) r = (p / 0.65) * 700;
+        else { const k = (p - 0.65) / 0.35; r = Math.max(180, 700 - k * 520) + Math.sin(p * 22) * 14; }
+        const fr = p > 0.55 ? Math.min(0.30, (p - 0.55) * 0.7) : 0;
+        return { users: u, rps: r, failRate: fr };
+      }
+    },
+    {
+      name: 'SOAK', title: 'Soak test',
+      desc: 'sustained moderate load · long duration',
+      color: '#0ea5e9',
+      maxUsers: 80, maxRps: 360,
+      curve: (p) => {
+        const u = p < 0.10 ? (p / 0.10) * 80 : 80;
+        const r = p < 0.10 ? (p / 0.10) * 340 : 340 + Math.sin(p * 40) * 12 + Math.sin(p * 13) * 6;
+        return { users: u, rps: r, failRate: 0.005 };
+      }
+    },
+    {
+      name: 'STEP', title: 'Step test',
+      desc: 'staircase · +20 users per step',
+      color: '#a855f7',
+      maxUsers: 100, maxRps: 500,
+      curve: (p) => {
+        const steps = 5; // 5 plateaus
+        const sIdx = Math.min(steps, Math.floor(p * steps) + 1);
+        const u = sIdx * 20;
+        const targetR = sIdx * 100;
+        // within each step, slight rise to target
+        const local = (p * steps) - Math.floor(p * steps);
+        const r = targetR * (0.85 + local * 0.15) + Math.sin(p * 60) * 6;
+        return { users: u, rps: r, failRate: 0 };
+      }
+    }
   ];
 
-  let st = { pi: 0, t0: 0 };
+  // ---- phases per cycle ----
+  // intro (banner shows) → run (curve plays) → cooldown (drain) → reset (clear)
+  const PHASE_DUR = { intro: 900, run: 7000, cooldown: 1100, reset: 500 };
+  const PHASE_ORDER = ['intro', 'run', 'cooldown', 'reset'];
+
+  let st = { pi: 0, phase: 'intro', t0: 0 };
   let lastT = 0;
 
-  // rps history — captured during load phase, shown growing
-  const RPS_POINTS = 60; // sample count for chart
+  const phase = () => st.phase;
+  const profile = () => PROFILES[st.pi];
+  const phaseProg = (now) => Math.max(0, Math.min(1, (now - st.t0) / PHASE_DUR[st.phase]));
+
+  // ---- rolling samples ----
+  const RPS_POINTS = 60;
   let rpsBuf = new Array(RPS_POINTS).fill(0);
-  let rpsHead = 0;
+  let usrBuf = new Array(RPS_POINTS).fill(0);
+  let head = 0;
 
   // accumulators
   let totalRequests = 0;
   let totalFailures = 0;
   const epStats = ENDPOINTS.map(() => ({ req: 0, fail: 0, avgMs: 0, p95Ms: 0 }));
 
-  // user dots — random positions in left grid box
+  // 10x10 user dot jitter params
   const USER_DOTS = [];
-  for (let i = 0; i < MAX_USERS; i++) {
+  for (let i = 0; i < 100; i++) {
     USER_DOTS.push({
-      rx: Math.random(),
-      ry: Math.random(),
       jitterPhase: Math.random() * Math.PI * 2,
       jitterSpeed: 0.6 + Math.random() * 0.9
     });
   }
 
   const advance = (now) => {
-    const p = PHASES[st.pi];
-    if (now - st.t0 < p.dur) return;
-    st.pi = (st.pi + 1) % PHASES.length;
+    if (now - st.t0 < PHASE_DUR[st.phase]) return;
     st.t0 = now;
-    if (st.pi === 0 || st.pi === 4) {
-      // reset accumulators on reset/idle
-      rpsBuf = new Array(RPS_POINTS).fill(0);
-      rpsHead = 0;
-      totalRequests = 0;
-      totalFailures = 0;
+    const next = PHASE_ORDER[(PHASE_ORDER.indexOf(st.phase) + 1) % PHASE_ORDER.length];
+    st.phase = next;
+    if (next === 'intro') {
+      // moving to next profile — reset accumulators + buffers
+      st.pi = (st.pi + 1) % PROFILES.length;
+      rpsBuf.fill(0); usrBuf.fill(0); head = 0;
+      totalRequests = 0; totalFailures = 0;
       for (const s of epStats) { s.req = 0; s.fail = 0; s.avgMs = 0; s.p95Ms = 0; }
     }
   };
 
-  const phase = () => PHASES[st.pi].name;
-  const phaseProg = (now) => {
-    const p = PHASES[st.pi];
-    return Math.max(0, Math.min(1, (now - st.t0) / p.dur));
-  };
-
-  // current user count based on phase
-  const userCount = (now) => {
+  // sample the current state
+  const sampleState = (now) => {
+    const pr = profile();
     const ph = phase();
-    if (ph === 'idle' || ph === 'reset') return 0;
-    if (ph === 'spawn') return Math.floor(MAX_USERS * phaseProg(now));
-    return MAX_USERS; // load / cooldown
-  };
-
-  // target rps based on phase (slight oscillation for liveliness)
-  const targetRps = (now) => {
-    const ph = phase();
-    if (ph === 'idle' || ph === 'reset' || ph === 'spawn') {
-      if (ph === 'spawn') {
-        // small ramp during spawn
-        return Math.floor(40 * phaseProg(now));
-      }
-      return 0;
-    }
-    if (ph === 'load') {
-      const p = phaseProg(now);
-      // climb to ~520 with subtle wobble
-      const base = 60 + Math.pow(p, 0.8) * 460;
-      const wob = Math.sin(now / 250) * 18 + Math.sin(now / 410) * 9;
-      return Math.max(0, Math.round(base + wob));
-    }
-    if (ph === 'cooldown') {
-      const p = 1 - phaseProg(now);
-      return Math.max(0, Math.round(520 * p * 0.7));
-    }
-    return 0;
+    if (ph === 'intro') return { users: 0, rps: 0, failRate: 0 };
+    if (ph === 'reset') return { users: 0, rps: 0, failRate: 0 };
+    if (ph === 'run') return pr.curve(phaseProg(now));
+    // cooldown — drain over cooldown duration from the last 'run' state
+    const k = 1 - phaseProg(now);
+    const last = pr.curve(1);
+    return { users: last.users * k, rps: last.rps * k, failRate: 0 };
   };
 
   // ---- layout ----
@@ -3505,16 +3557,11 @@
     const SAFE = Math.max(20, W * 0.06);
     const top = 18;
     const totalW = W - SAFE * 2;
-    const headerH = 38;
+    const headerH = 42;
     const panelH = 168;
-
-    // header bar
     const header = { x: SAFE, y: top, w: totalW, h: headerH };
-
-    // panels
     const py = top + headerH + 10;
     const gap = 12;
-    // left users (28%), middle chart (44%), right stats (28%)
     const wL = Math.round(totalW * 0.28);
     const wR = Math.round(totalW * 0.28);
     const wM = totalW - wL - wR - gap * 2;
@@ -3526,8 +3573,11 @@
     };
   };
 
-  // ---- header bar ----
+  // ---- header ----
   const drawHeader = (now, h) => {
+    const pr = profile();
+    const ph = phase();
+
     // dark bar
     ctx.save();
     ctx.shadowColor = 'rgba(10,10,12,0.12)';
@@ -3538,34 +3588,50 @@
     ctx.fill();
     ctx.restore();
 
+    // accent strip on left (profile color)
+    ctx.fillStyle = pr.color;
+    roundRect(h.x, h.y, 4, h.h, 10);
+    ctx.fill();
+    ctx.fillRect(h.x + 2, h.y, 2, h.h);
+
     // locust brand
     ctx.fillStyle = '#16c47b';
     ctx.font = '900 12px ui-monospace, "JetBrains Mono", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🦗 locust', h.x + 14, h.y + h.h / 2);
-    ctx.fillStyle = 'rgba(230,227,218,0.45)';
-    ctx.font = '600 10px ui-monospace, "JetBrains Mono", monospace';
-    ctx.fillText(' / load test · users-api', h.x + 78, h.y + h.h / 2);
+    ctx.fillText('🦗 locust', h.x + 14, h.y + h.h / 2 - 8);
+    const brandW = ctx.measureText('🦗 locust').width;
+    ctx.fillStyle = 'rgba(230,227,218,0.55)';
+    ctx.font = '600 9px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText('· users-api', h.x + 14 + brandW + 8, h.y + h.h / 2 - 8);
 
-    // status pill
-    const ph = phase();
-    const pulse = (ph === 'load' || ph === 'spawn');
-    const labelMap = { idle: 'READY', spawn: 'SPAWNING', load: 'RUNNING', cooldown: 'STOPPING', reset: 'RESET' };
-    const colorMap = { idle: '#475569', spawn: '#f59e0b', load: '#18a957', cooldown: '#f59e0b', reset: '#475569' };
-    // Right-aligned cluster: [users  spawn]  [PILL]
-    const pillW = 96;
+    // profile NAME big
+    ctx.fillStyle = pr.color;
+    ctx.font = '900 14px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const introBlink = (ph === 'intro' && (performance.now() % 600) < 320) ? 0.4 : 1;
+    ctx.globalAlpha = introBlink;
+    ctx.fillText(pr.name, h.x + 14, h.y + h.h / 2 + 9);
+    ctx.globalAlpha = 1;
+    // subtitle
+    const nameW = ctx.measureText(pr.name).width;
+    ctx.fillStyle = 'rgba(230,227,218,0.55)';
+    ctx.font = '600 9px ui-monospace, "JetBrains Mono", monospace';
+    ctx.fillText('· ' + pr.desc, h.x + 14 + nameW + 8, h.y + h.h / 2 + 9);
+
+    // status pill (right)
+    const labelMap = { intro: 'ARMED', run: 'RUNNING', cooldown: 'STOPPING', reset: 'RESET' };
+    const colorMap = { intro: pr.color, run: '#18a957', cooldown: '#f59e0b', reset: '#475569' };
+    const pillW = 110;
     const pillY = h.y + (h.h - 22) / 2;
     const pillX = h.x + h.w - 14 - pillW;
-    if (pulse) {
-      ctx.shadowColor = colorMap[ph];
-      ctx.shadowBlur = 14;
-    }
+    const pulse = (ph === 'intro' || ph === 'run' || ph === 'cooldown');
+    if (pulse) { ctx.shadowColor = colorMap[ph]; ctx.shadowBlur = 14; }
     ctx.fillStyle = colorMap[ph];
     roundRect(pillX, pillY, pillW, 22, 4);
     ctx.fill();
     ctx.shadowBlur = 0;
-    // pulsing dot inside pill
     if (pulse) {
       const a = 0.55 + 0.45 * Math.sin(now / 220);
       ctx.globalAlpha = a;
@@ -3581,71 +3647,77 @@
     ctx.textBaseline = 'middle';
     ctx.fillText(labelMap[ph], pillX + pillW / 2 + 6, pillY + 11);
 
-    // users + spawn text to the left of the pill
-    const u = userCount(now);
+    // users + spawn (left of pill)
+    const s = sampleState(now);
+    const uNow = Math.round(s.users);
     ctx.fillStyle = 'rgba(230,227,218,0.85)';
     ctx.font = '700 11px ui-monospace, "JetBrains Mono", monospace';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`users ${u}/${MAX_USERS}`, pillX - 14, h.y + h.h / 2);
-    const uW = ctx.measureText(`users ${u}/${MAX_USERS}`).width;
-    ctx.fillStyle = 'rgba(230,227,218,0.55)';
-    ctx.font = '600 10px ui-monospace, "JetBrains Mono", monospace';
-    ctx.fillText('· spawn 10/s', pillX - 14 - uW - 6, h.y + h.h / 2);
+    ctx.fillText(`users ${uNow}/${pr.maxUsers}`, pillX - 14, h.y + h.h / 2);
+    const uW = ctx.measureText(`users ${uNow}/${pr.maxUsers}`).width;
+    // profile progress dots (top right)
+    for (let i = 0; i < PROFILES.length; i++) {
+      const dx = pillX - 14 - uW - 14 - (PROFILES.length - 1 - i) * 10;
+      ctx.fillStyle = (i === st.pi) ? PROFILES[i].color : 'rgba(230,227,218,0.20)';
+      ctx.beginPath();
+      ctx.arc(dx, h.y + h.h / 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
   };
 
   // ---- left panel: users grid + big count ----
   const drawUsersPanel = (now, r) => {
-    panelChrome(r, 'USERS', '#16c47b');
-    const u = userCount(now);
-    const p = phaseProg(now);
-    // huge number
+    panelChrome(r, 'USERS', profile().color);
+    const s = sampleState(now);
+    const u = Math.round(s.users);
+    const pr = profile();
     ctx.fillStyle = '#1d1d22';
-    ctx.font = '900 36px ui-monospace, "JetBrains Mono", monospace';
+    ctx.font = '900 32px ui-monospace, "JetBrains Mono", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(String(u), r.x + 14, r.y + 30);
     ctx.fillStyle = 'rgba(10,10,12,0.45)';
     ctx.font = '600 10px ui-monospace, "JetBrains Mono", monospace';
-    ctx.fillText(`/ ${MAX_USERS} target`, r.x + 14, r.y + 70);
+    ctx.fillText(`/ ${pr.maxUsers} target`, r.x + 14, r.y + 64);
 
-    // ramp progress bar
+    // ramp progress bar (current/max)
     const barX = r.x + 14;
-    const barY = r.y + 90;
+    const barY = r.y + 84;
     const barW = r.w - 28;
     ctx.fillStyle = 'rgba(10,10,12,0.06)';
     roundRect(barX, barY, barW, 4, 2);
     ctx.fill();
-    const ratio = u / MAX_USERS;
+    const ratio = Math.min(1, u / pr.maxUsers);
     if (ratio > 0) {
       const g = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-      g.addColorStop(0, '#16c47b');
-      g.addColorStop(1, '#0a9c5e');
+      g.addColorStop(0, pr.color);
+      g.addColorStop(1, pr.color);
       ctx.fillStyle = g;
       roundRect(barX, barY, barW * ratio, 4, 2);
       ctx.fill();
     }
 
-    // dots grid (10x10 = 100 spots)
+    // dots grid (10x10) — visualize active workers up to 100
     const gridX = r.x + 14;
-    const gridY = r.y + 104;
+    const gridY = r.y + 98;
     const gridW = r.w - 28;
     const gridH = r.h - (gridY - r.y) - 10;
     const cols = 10, rows = 10;
     const cw = gridW / cols;
     const ch = gridH / rows;
-    for (let i = 0; i < MAX_USERS; i++) {
+    const activeDots = Math.min(100, Math.round((u / pr.maxUsers) * 100));
+    for (let i = 0; i < 100; i++) {
       const dot = USER_DOTS[i];
       const col = i % cols;
       const row = Math.floor(i / cols);
       const cx = gridX + col * cw + cw / 2;
       const cy = gridY + row * ch + ch / 2;
-      const active = i < u;
+      const active = i < activeDots;
       if (active) {
-        // jittering hue for "running" feel
         const jx = Math.sin(now / 600 * dot.jitterSpeed + dot.jitterPhase) * 0.6;
         const jy = Math.cos(now / 600 * dot.jitterSpeed + dot.jitterPhase) * 0.6;
-        ctx.fillStyle = '#16c47b';
+        ctx.fillStyle = pr.color;
         ctx.beginPath();
         ctx.arc(cx + jx, cy + jy, 2.4, 0, Math.PI * 2);
         ctx.fill();
@@ -3658,43 +3730,40 @@
     }
   };
 
-  // ---- middle panel: RPS line chart ----
+  // ---- middle panel: RPS chart ----
   const drawChartPanel = (now, r) => {
     panelChrome(r, 'REQUESTS / SEC', '#0ea5e9');
+    const pr = profile();
+    const s = sampleState(now);
 
-    // push current rps into buffer at sample interval (every ~80ms)
-    const sample = targetRps(now);
+    // push samples
     if (!drawChartPanel.lastSample || now - drawChartPanel.lastSample > 80) {
-      rpsBuf[rpsHead] = sample;
-      rpsHead = (rpsHead + 1) % RPS_POINTS;
+      rpsBuf[head] = s.rps;
+      usrBuf[head] = s.users;
+      head = (head + 1) % RPS_POINTS;
       drawChartPanel.lastSample = now;
-      // accumulate per-endpoint stats
       const dt = 0.08;
-      const inc = sample * dt;
+      const inc = s.rps * dt;
       totalRequests += inc;
       for (let i = 0; i < ENDPOINTS.length; i++) {
-        const e = ENDPOINTS[i];
-        const subInc = inc * e.weight;
+        const subInc = inc * ENDPOINTS[i].weight;
         epStats[i].req += subInc;
-        // small fail rate, varies per endpoint
-        const failRate = (i === 1) ? 0.012 : 0.004;
-        const failInc = subInc * failRate;
+        const baseFail = (i === 1) ? 0.012 : 0.004;
+        const failInc = subInc * (baseFail + (s.failRate || 0));
         epStats[i].fail += failInc;
         totalFailures += failInc;
-        // running latency-like avg
-        const targetAvg = 40 + i * 22 + (phase() === 'load' ? Math.min(40, sample / 12) : 0);
+        const targetAvg = 40 + i * 22 + (s.rps / 14) + (s.failRate ? s.failRate * 200 : 0);
         epStats[i].avgMs += (targetAvg - epStats[i].avgMs) * 0.18;
         epStats[i].p95Ms += (targetAvg * 2.2 - epStats[i].p95Ms) * 0.18;
       }
     }
 
-    // chart area
     const cx0 = r.x + 14;
     const cy0 = r.y + 36;
     const cw  = r.w - 28;
     const ch  = r.h - (cy0 - r.y) - 16;
 
-    // background gridlines
+    // grid + axis labels
     ctx.strokeStyle = 'rgba(10,10,12,0.06)';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
@@ -3704,23 +3773,22 @@
       ctx.lineTo(cx0 + cw, yy);
       ctx.stroke();
     }
-    // y axis labels
+    const maxRps = pr.maxRps;
     ctx.fillStyle = 'rgba(10,10,12,0.40)';
     ctx.font = '600 8px ui-monospace, "JetBrains Mono", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    const maxRps = 600;
     for (let i = 0; i <= 4; i++) {
-      ctx.fillText(String(maxRps - (maxRps / 4) * i), cx0 + 2, cy0 + (ch / 4) * i);
+      ctx.fillText(String(Math.round(maxRps - (maxRps / 4) * i)), cx0 + 2, cy0 + (ch / 4) * i);
     }
 
-    // line path
+    // line
     ctx.beginPath();
     ctx.lineWidth = 1.8;
-    ctx.strokeStyle = '#0ea5e9';
+    ctx.strokeStyle = pr.color;
     for (let i = 0; i < RPS_POINTS; i++) {
-      const idx = (rpsHead + i) % RPS_POINTS;
-      const v = rpsBuf[idx];
+      const idx = (head + i) % RPS_POINTS;
+      const v = Math.max(0, Math.min(maxRps, rpsBuf[idx]));
       const xx = cx0 + (i / (RPS_POINTS - 1)) * cw;
       const yy = cy0 + ch - (v / maxRps) * ch;
       if (i === 0) ctx.moveTo(xx, yy);
@@ -3728,19 +3796,20 @@
     }
     ctx.stroke();
 
-    // area fill below
+    // area fill
     ctx.lineTo(cx0 + cw, cy0 + ch);
     ctx.lineTo(cx0, cy0 + ch);
     ctx.closePath();
     const g = ctx.createLinearGradient(0, cy0, 0, cy0 + ch);
-    g.addColorStop(0, 'rgba(14,165,233,0.30)');
-    g.addColorStop(1, 'rgba(14,165,233,0.00)');
+    const rgb = hexToRgb(pr.color);
+    g.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},0.30)`);
+    g.addColorStop(1, `rgba(${rgb.r},${rgb.g},${rgb.b},0.00)`);
     ctx.fillStyle = g;
     ctx.fill();
 
-    // current value label (top right, big)
-    const curr = Math.round(sample);
-    ctx.fillStyle = '#0ea5e9';
+    // current value (big, top right)
+    const curr = Math.round(s.rps);
+    ctx.fillStyle = pr.color;
     ctx.font = '900 18px ui-monospace, "JetBrains Mono", monospace';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
@@ -3749,47 +3818,63 @@
     ctx.font = '600 9px ui-monospace, "JetBrains Mono", monospace';
     ctx.fillText('rps', r.x + r.w - 16, r.y + 52);
 
-    // moving cursor dot at last point
+    // cursor dot at last sample
     if (curr > 0) {
-      const lastIdx = (rpsHead - 1 + RPS_POINTS) % RPS_POINTS;
+      const lastIdx = (head - 1 + RPS_POINTS) % RPS_POINTS;
       const xx = cx0 + cw;
-      const yy = cy0 + ch - (rpsBuf[lastIdx] / maxRps) * ch;
-      ctx.shadowColor = '#0ea5e9';
+      const yy = cy0 + ch - (Math.max(0, Math.min(maxRps, rpsBuf[lastIdx])) / maxRps) * ch;
+      ctx.shadowColor = pr.color;
       ctx.shadowBlur = 10;
-      ctx.fillStyle = '#0ea5e9';
+      ctx.fillStyle = pr.color;
       ctx.beginPath();
       ctx.arc(xx, yy, 3, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
     }
+
+    // breakpoint marker for STRESS
+    if (pr.name === 'STRESS' && phase() === 'run' && phaseProg(now) > 0.65) {
+      ctx.strokeStyle = '#ef4444';
+      ctx.setLineDash([3, 3]);
+      ctx.lineWidth = 1;
+      const bx = cx0 + cw * 0.65;
+      ctx.beginPath();
+      ctx.moveTo(bx, cy0);
+      ctx.lineTo(bx, cy0 + ch);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText('break', bx + 3, cy0 + 2);
+    }
   };
 
-  // ---- right panel: live metrics ----
+  // ---- right panel: metrics ----
   const drawMetricsPanel = (now, r) => {
     panelChrome(r, 'METRICS', '#6d3df1');
+    const failPct = totalRequests > 0 ? (totalFailures / totalRequests * 100) : 0;
     const rows = [
       { label: 'TOTAL', value: formatNum(Math.round(totalRequests)), color: '#1d1d22' },
-      { label: 'FAILS', value: `${Math.round(totalFailures)}` +
-        (totalRequests > 0 ? `  ${(totalFailures / totalRequests * 100).toFixed(2)}%` : ''),
-        color: totalFailures > 0 ? '#ef4444' : '#0a6f3a' },
+      { label: 'FAILS',
+        value: `${Math.round(totalFailures)}` + (totalRequests > 0 ? `  ${failPct.toFixed(2)}%` : ''),
+        color: failPct > 1 ? '#ef4444' : (failPct > 0.1 ? '#f59e0b' : '#0a6f3a') },
       { label: 'AVG ms', value: epStats[0].avgMs ? Math.round(avg(epStats.map(s => s.avgMs))) + ' ms' : '— ms', color: '#1d1d22' },
       { label: 'P95 ms', value: epStats[0].p95Ms ? Math.round(avg(epStats.map(s => s.p95Ms))) + ' ms' : '— ms', color: '#f59e0b' }
     ];
     const rowH = (r.h - 38) / rows.length;
     for (let i = 0; i < rows.length; i++) {
       const yy = r.y + 30 + i * rowH;
-      // label
       ctx.fillStyle = 'rgba(10,10,12,0.45)';
       ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.fillText(rows[i].label, r.x + 14, yy + rowH / 2);
-      // value
       ctx.fillStyle = rows[i].color;
-      ctx.font = '900 14px ui-monospace, "JetBrains Mono", monospace';
+      ctx.font = '900 13px ui-monospace, "JetBrains Mono", monospace';
       ctx.textAlign = 'right';
       ctx.fillText(rows[i].value, r.x + r.w - 14, yy + rowH / 2);
-      // divider
       if (i < rows.length - 1) {
         ctx.strokeStyle = 'rgba(10,10,12,0.06)';
         ctx.beginPath();
@@ -3800,7 +3885,7 @@
     }
   };
 
-  // panel chrome (shared with the other dashboards)
+  // panel chrome
   const panelChrome = (r, label, accent) => {
     ctx.save();
     ctx.shadowColor = 'rgba(10,10,12,0.10)';
@@ -3814,17 +3899,14 @@
     ctx.lineWidth = 1;
     roundRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1, 12);
     ctx.stroke();
-    // header strip
     ctx.fillStyle = 'rgba(10,10,12,0.04)';
     roundRect(r.x, r.y, r.w, 22, 12);
     ctx.fill();
     ctx.fillRect(r.x, r.y + 14, r.w, 8);
-    // accent dot
     ctx.fillStyle = accent;
     ctx.beginPath();
     ctx.arc(r.x + 12, r.y + 11, 3, 0, Math.PI * 2);
     ctx.fill();
-    // label
     ctx.fillStyle = 'rgba(10,10,12,0.70)';
     ctx.font = '700 9px ui-monospace, "JetBrains Mono", monospace';
     ctx.textAlign = 'left';
@@ -3832,11 +3914,18 @@
     ctx.fillText(label, r.x + 22, r.y + 11);
   };
 
-  // ---- helpers ----
   function avg(a) { return a.reduce((s, v) => s + v, 0) / a.length; }
   function formatNum(n) {
     if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 1 : 2) + 'k';
     return String(n);
+  }
+  function hexToRgb(hex) {
+    const h = hex.replace('#', '');
+    return {
+      r: parseInt(h.slice(0, 2), 16),
+      g: parseInt(h.slice(2, 4), 16),
+      b: parseInt(h.slice(4, 6), 16)
+    };
   }
 
   const tick = (now) => {
@@ -3856,4 +3945,3 @@
   };
   requestAnimationFrame(tick);
 })();
-
