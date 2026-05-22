@@ -351,10 +351,10 @@
     }, { passive: true });
     window.addEventListener('pointerleave', () => { mx = -9999; my = -9999; });
     window.addEventListener('pointerdown', (e) => {
-      const unitX = gates.length ? gates[0].x : 0;
+      const qaEnvX = gates.length > 1 ? gates[1].x : 0;
       for (const b of bugs) {
         if (b.state !== 'crawling') continue;
-        if (b.x < unitX) continue;     // QA can't reach pre-UNIT bugs (devs' territory)
+        if (b.x < qaEnvX) continue;    // QA only acts AFTER QA ENV line — guarding prod
         const dx = b.x - e.clientX, dy = b.y - e.clientY;
         if (dx*dx + dy*dy < 110*110) killBug(b, 'squash', null, 'qa');
       }
@@ -731,14 +731,15 @@
       ctx.fillStyle = '#ffffff';
       ctx.fillText('▶ PROD', prodX - ptw / 2, 90);
 
-      // ---- sentinels: aim at closest crawling bug (post-UNIT only), fire if cooldown elapsed ----
+      // ---- sentinels: QA guards PROD — only fire at bugs that crossed QA ENV ----
       const unitX = gates.length ? gates[0].x : 0;
+      const qaEnvX = gates.length > 1 ? gates[1].x : 0;
       for (const s of sentinels) {
-        // find closest bug past UNIT line
+        // find closest bug past QA ENV line (only bugs in QA territory)
         let target = null, bestD = 1e9;
         for (const b of bugs) {
           if (b.state !== 'crawling') continue;
-          if (b.x < unitX) continue;            // QA can't shoot pre-UNIT bugs
+          if (b.x < qaEnvX) continue;           // QA can't shoot bugs still in dev/unit territory
           if (b.x > prodX - 8) continue;
           const dx = b.x - s.x, dy = b.y - s.y;
           const d = dx*dx + dy*dy;
@@ -815,8 +816,8 @@
           }
 
           // cursor squash (counts as QA — you, the QA engineer, did it)
-          // QA can only act on bugs that have crossed the UNIT line
-          if (mx > -9000 && b.x >= unitX) {
+          // QA can only act on bugs that have crossed the QA ENV line — guarding prod
+          if (mx > -9000 && b.x >= qaEnvX) {
             const dx = b.x - mx, dy = b.y - my;
             if (dx*dx + dy*dy < SQUASH_R * SQUASH_R) killBug(b, 'squash', null, 'qa');
           }
