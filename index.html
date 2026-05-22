@@ -206,40 +206,46 @@
         </div>
       </article>
 
-      <article class="bento-card has-preview">
-        <h3>REST API Automation Suite</h3>
-        <p>JSON / XML contract tests, auth flows, schema validation &amp; negative paths via Playwright APIRequestContext + Postman.</p>
-        <div class="chips"><span>Playwright API</span><span>Postman</span><span>JSON</span><span>XML</span></div>
-        <canvas class="card-canvas" id="card-canvas-api" aria-hidden="true"></canvas>
-      </article>
-
-      <article class="bento-card has-preview">
-        <h3>Locust Performance Suite</h3>
-        <p>Load, spike, stress &amp; soak tests simulating concurrent users. Surfaces throughput &amp; latency bottlenecks pre-production.</p>
-        <div class="chips"><span>Locust.py</span><span>Python</span><span>REST</span></div>
-        <canvas class="card-canvas" id="card-canvas-locust" aria-hidden="true"></canvas>
-      </article>
-
       <article class="bento-card">
         <h3>Cypress E2E Framework</h3>
         <p>Built from scratch with POM, reusable commands &amp; Bitbucket Pipelines for PR-gated regression.</p>
         <div class="chips"><span>Cypress</span><span>Bitbucket</span><span>POM</span></div>
       </article>
 
-      <article class="bento-card bento-wide">
-        <h3>Jenkins CI/CD + Allure Dashboards</h3>
-        <p>Multi-env pipelines feeding Allure dashboards on S3 — real-time quality signals for release go / no-go decisions.</p>
-        <div class="chips"><span>Jenkins</span><span>Allure</span><span>AWS S3</span><span>EC2</span></div>
+      <article class="bento-card">
+        <h3>Jenkins CI/CD + Allure</h3>
+        <p>Multi-env pipelines feeding Allure dashboards on S3 — real-time quality signals for release go / no-go.</p>
+        <div class="chips"><span>Jenkins</span><span>Allure</span><span>AWS S3</span></div>
       </article>
 
-      <article class="bento-card has-preview">
-        <h3>OWASP ZAP Security Scan</h3>
-        <p>Automated DAST scans against staging APIs &amp; web apps. Spider + active scan flags injection, XSS, auth &amp; header risks before release.</p>
-        <div class="chips"><span>OWASP ZAP</span><span>DAST</span><span>SAST</span><span>CI gate</span></div>
+      <article class="bento-card bento-full has-preview">
+        <div class="preview-text">
+          <h3>REST API Automation Suite</h3>
+          <p>JSON / XML contract tests, auth flows, schema validation &amp; negative paths via Playwright APIRequestContext + Postman. Validates every CRUD verb against staging APIs before UI tests run.</p>
+          <div class="chips"><span>Playwright API</span><span>Postman</span><span>JSON</span><span>XML</span><span>Schema</span></div>
+        </div>
+        <canvas class="card-canvas" id="card-canvas-api" aria-hidden="true"></canvas>
+      </article>
+
+      <article class="bento-card bento-full has-preview">
+        <div class="preview-text">
+          <h3>Locust Performance Suite</h3>
+          <p>Load, spike, stress &amp; soak tests simulating thousands of concurrent users. Live dashboard surfaces throughput &amp; latency bottlenecks before production hits them.</p>
+          <div class="chips"><span>Locust.py</span><span>Python</span><span>REST</span><span>SLA</span></div>
+        </div>
+        <canvas class="card-canvas" id="card-canvas-locust" aria-hidden="true"></canvas>
+      </article>
+
+      <article class="bento-card bento-full has-preview">
+        <div class="preview-text">
+          <h3>OWASP ZAP Security Scan</h3>
+          <p>Automated DAST scans against staging APIs &amp; web apps. Spider + active scan flag injection, XSS, auth &amp; header risks before each release, gated in CI.</p>
+          <div class="chips"><span>OWASP ZAP</span><span>DAST</span><span>SAST</span><span>CI gate</span></div>
+        </div>
         <canvas class="card-canvas" id="card-canvas-zap" aria-hidden="true"></canvas>
       </article>
 
-      <article class="bento-card">
+      <article class="bento-card bento-wide">
         <h3>AI Fluency Track</h3>
         <p>11 certifications: Prompt Engineering, Claude Code, MCP, Agent Skills, Subagents, AI Capabilities &amp; Limitations.</p>
         <div class="chips"><span>Claude</span><span>MCP</span><span>Agents</span></div>
