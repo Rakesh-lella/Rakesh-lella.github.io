@@ -277,8 +277,10 @@
         // stealthP = override for stealth bugs (lower = more survive)
         // owner: 'dev' (unit tests, written by devs) | 'qa' (QA-owned envs)
         { x: W * 0.38, label: 'UNIT',   caption: 'DEV UNIT TESTS', owner: 'dev', p: 0.12, stealthP: 0.08, color: '#0ea5e9' },
-        { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 1.00, stealthP: 0.55, color: '#f97316' },
-        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 1.00, stealthP: 1.00, color: '#a855f7' }
+        // QA ENV: ~half of non-stealth bugs survive past the line so the user can also squash them
+        { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 0.55, stealthP: 0.20, color: '#f97316' },
+        // STAGE: catches most of what is left, but a few stealth bugs slip past for sentinels
+        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 0.85, stealthP: 0.50, color: '#a855f7' }
       ];
       // devs at left edge (3 workstations)
       const devY = [H * 0.30, H * 0.55, H * 0.78];
@@ -297,12 +299,12 @@
           screenGlow: 0
         });
       }
-      // 3 sentinels stand right in front of PROD line, guarding production
+      // 2 QA sentinels stand right in front of PROD line, guarding production
       const prodX = W * PROD_X_FRAC;
-      const sentY = [H * 0.28, H * 0.55, H * 0.80];
-      const sentColor = ['#0ea5e9', '#18a957', '#f97316'];
+      const sentY = [H * 0.38, H * 0.72];
+      const sentColor = ['#18a957', '#0ea5e9'];
       sentinels.length = 0;
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 2; i++) {
         sentinels.push({
           x: prodX - 34, y: sentY[i],
           color: sentColor[i], aim: Math.PI,
@@ -563,6 +565,21 @@
       const x = s.x, y = s.y;
       const charging = s.charge > 0;
       ctx.save();
+      // floating "QA" name tag above the sentinel
+      ctx.fillStyle = 'rgba(10,10,12,0.92)';
+      ctx.beginPath(); ctx.roundRect(x - 14, y - 32, 28, 12, 3); ctx.fill();
+      ctx.fillStyle = s.color;
+      ctx.fillRect(x - 14, y - 32, 3, 12);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 8px ui-monospace, "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('QA', x + 1, y - 23);
+      ctx.textAlign = 'start';
+      // tag pointer
+      ctx.fillStyle = 'rgba(10,10,12,0.92)';
+      ctx.beginPath();
+      ctx.moveTo(x - 3, y - 20); ctx.lineTo(x + 3, y - 20); ctx.lineTo(x, y - 17); ctx.closePath();
+      ctx.fill();
       // base shadow
       ctx.fillStyle = 'rgba(10,10,12,0.10)';
       ctx.beginPath(); ctx.ellipse(x, y + 18, 14, 3, 0, 0, Math.PI * 2); ctx.fill();
@@ -2336,6 +2353,14 @@
     new IntersectionObserver(es => { __visible = es[0].isIntersecting; }, { threshold: 0 }).observe(c);
   }
 
+  // ---- pipeline layout constants (used inside resize) ----
+  const SAFE_LEFT  = 0.045;
+  const SAFE_RIGHT = 0.955;
+  const MIN_GAP    = 36;        // min visible gap between card edges
+  let   CARD_W     = 124;
+  const CARD_H     = 100;
+  const CARD_Y     = 76;        // vertical center of card row (above the section-head)
+
   const resize = () => {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     const r = c.getBoundingClientRect();
@@ -2343,6 +2368,9 @@
     H = Math.max(280, r.height);
     c.width = W * dpr; c.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // recompute card width so there's a visible gap (>= MIN_GAP) between stations
+    const segGap = (W * (SAFE_RIGHT - SAFE_LEFT)) / 6;   // 7 stations -> 6 gaps
+    CARD_W = Math.max(70, Math.min(124, segGap - MIN_GAP));
   };
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(c);
   window.addEventListener('resize', resize);
@@ -2364,11 +2392,10 @@
   const DWELL = 900;        // ms per station — longer so detailed body anim plays
   const PAUSE_AFTER_LOOP = 1600;
 
-  const SAFE_LEFT  = 0.085;
-  const SAFE_RIGHT = 0.915;
-  const CARD_W = 132;
-  const CARD_H = 100;
-  const CARD_Y = 76;        // vertical center of card row (above the section-head)
+  const SAFE_LEFT_DUP_REMOVED = (() => {
+    // sizing constants moved above resize() to fix temporal dead zone
+    return null;
+  })();
 
   const stationFor = (i) => {
     const f = SAFE_LEFT + (SAFE_RIGHT - SAFE_LEFT) * (i / (STAGES.length - 1));
