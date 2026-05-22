@@ -213,11 +213,11 @@
     });
   })();
 
-  // ===== Cute Bug Zoo vs QA Sentinels (flagship, QA-themed background) =====
-  // 4 colorful bug species (ladybug/bee/caterpillar/butterfly) spawn at edges
-  // and crawl toward the PROD line. Two test gates ⚡zap some; QA sentinels
-  // stationed in front of PROD aim & fire colored lasers at the closest bug.
-  // Kills explode in confetti. Cursor can still squash on hover/click.
+  // ===== CI/CD Pipeline (flagship, QA-themed background) =====
+  // Left: 3 devs at workstations — cute bugs crawl out of their monitors.
+  // Pipeline: UNIT (kills ~20%) → QA ENV (kills 99%, only stealth survive)
+  // → STAGE (sentinels with lasers finish off any stealth bugs).
+  // PROD line on the far right stays clean. Cursor can still squash any bug.
   (() => {
     const c = $('#bg-canvas');
     if (!c || prefersReduced) return;
@@ -242,19 +242,21 @@
     const trail = [];
     const sentinels = [];
 
-    const MAX_BUGS = 10;
+    const MAX_BUGS = 12;
     const SQUASH_R = 70;
-    const PROD_X_FRAC = 0.93;
+    const PROD_X_FRAC = 0.94;
     let prodFlashT = 0;
     let killCount = 0;
     let leakCount = 0;
     let stealthKills = 0;
+    let bugsSpawned = 0;
 
     let mx = -9999, my = -9999;
     let mLast = { x: 0, y: 0, t: 0 };
 
-    // gates with electric arc spark schedule
+    // gates + devs
     let gates = [];
+    let devs  = [];
 
     const resize = () => {
       dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -264,17 +266,37 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       w = W; h = H;
       gates = [
-        { x: W * 0.42, label: 'UNIT', p: 0.35, color: '#0ea5e9', lastArc: 0 },
-        { x: W * 0.68, label: 'E2E',  p: 0.45, color: '#f97316', lastArc: 0 }
+        // p = kill probability for *non-stealth* bugs;
+        // stealthP = override for stealth bugs (lower = more survive)
+        { x: W * 0.38, label: 'UNIT',   p: 0.20, stealthP: 0.15, color: '#0ea5e9' },
+        { x: W * 0.60, label: 'QA ENV', p: 1.00, stealthP: 0.55, color: '#f97316' },
+        { x: W * 0.80, label: 'STAGE',  p: 1.00, stealthP: 1.00, color: '#a855f7' }
       ];
-      // 3 sentinels along PROD line (positioned just left of PROD line)
-      const prodX = W * PROD_X_FRAC;
-      sentinels.length = 0;
+      // devs at left edge (3 workstations)
+      const devY = [H * 0.30, H * 0.55, H * 0.78];
+      const devColors = [
+        { shirt: '#2563eb', hair: '#1e293b', skin: '#fcd9b6' },
+        { shirt: '#10b981', hair: '#7c2d12', skin: '#fde2b8' },
+        { shirt: '#ef4444', hair: '#0a0a0c', skin: '#f7d1a8' }
+      ];
+      devs = [];
+      for (let i = 0; i < 3; i++) {
+        devs.push({
+          x: 78, y: devY[i],
+          color: devColors[i],
+          typePhase: Math.random() * Math.PI * 2,
+          spawnT: 0,
+          screenGlow: 0
+        });
+      }
+      // 3 sentinels in front of STAGE gate (not PROD)
+      const stageX = W * 0.80;
       const sentY = [H * 0.28, H * 0.55, H * 0.80];
       const sentColor = ['#0ea5e9', '#18a957', '#f97316'];
+      sentinels.length = 0;
       for (let i = 0; i < 3; i++) {
         sentinels.push({
-          x: prodX - 26, y: sentY[i],
+          x: stageX - 30, y: sentY[i],
           color: sentColor[i], aim: Math.PI,
           lastFire: 0, charge: 0
         });
@@ -283,13 +305,15 @@
 
     const spawnBug = () => {
       if (bugs.length >= MAX_BUGS) return;
+      if (!devs.length) return;
       const speciesKey = SPECIES_KEYS[(Math.random() * SPECIES_KEYS.length) | 0];
       const sp = SPECIES[speciesKey];
-      const side = Math.random();
-      let x, y;
-      if (side < 0.75) { x = -25; y = 80 + Math.random() * (h - 160); }
-      else if (side < 0.88) { x = Math.random() * w * 0.35; y = -25; }
-      else { x = Math.random() * w * 0.35; y = h + 25; }
+      // spawn from a random dev's monitor
+      const dev = devs[(Math.random() * devs.length) | 0];
+      dev.screenGlow = performance.now();
+      const x = dev.x + 28;
+      const y = dev.y - 6 + (Math.random() - 0.5) * 8;
+      bugsSpawned++;
       bugs.push({
         species: speciesKey,
         x, y,
@@ -303,7 +327,7 @@
         dieT: 0,
         passedGates: new Set(),
         targeted: false,
-        stealth: Math.random() < 0.32     // ~1/3 of bugs are stealth (faint)
+        stealth: Math.random() < 0.32
       });
     };
 
@@ -569,12 +593,85 @@
       ctx.stroke();
     };
 
+    // ---- cute developer at workstation ----
+    const drawDev = (d, now) => {
+      const x = d.x, y = d.y;
+      const type = Math.sin(now / 90 + d.typePhase);   // -1..1, typing motion
+      const glow = Math.max(0, 1 - (now - d.screenGlow) / 350);
+      ctx.save();
+      // chair/desk shadow
+      ctx.fillStyle = 'rgba(10,10,12,0.10)';
+      ctx.beginPath(); ctx.ellipse(x, y + 24, 22, 4, 0, 0, Math.PI * 2); ctx.fill();
+      // monitor stand
+      ctx.fillStyle = '#374151';
+      ctx.fillRect(x + 12, y + 8, 4, 12);
+      ctx.fillRect(x + 6, y + 19, 16, 3);
+      // monitor (rounded rect)
+      ctx.fillStyle = '#0a0a0c';
+      ctx.beginPath(); ctx.roundRect(x + 2, y - 14, 24, 22, 3); ctx.fill();
+      // screen (glowing on spawn)
+      const screenCol = glow > 0
+        ? `rgba(34, 197, 94, ${0.55 + glow * 0.45})`
+        : 'rgba(34, 197, 94, 0.40)';
+      ctx.fillStyle = screenCol;
+      ctx.fillRect(x + 4, y - 12, 20, 18);
+      // code lines on screen
+      ctx.fillStyle = 'rgba(10,10,12,0.75)';
+      ctx.fillRect(x + 6, y - 10, 6 + (type * 2 + 2), 1.4);
+      ctx.fillRect(x + 6, y - 7,  10, 1.4);
+      ctx.fillRect(x + 6, y - 4,  4 + (type * 3 + 3), 1.4);
+      ctx.fillRect(x + 6, y - 1,  12, 1.4);
+      ctx.fillRect(x + 6, y + 2,  6 + (type * 2 + 2), 1.4);
+      // dev (behind monitor)
+      // body
+      ctx.fillStyle = d.color.shirt;
+      ctx.beginPath();
+      ctx.roundRect(x - 14, y - 4, 14, 18, 4);
+      ctx.fill();
+      // head
+      ctx.fillStyle = d.color.skin;
+      ctx.beginPath(); ctx.arc(x - 7, y - 12, 6.5, 0, Math.PI * 2); ctx.fill();
+      // hair (top cap)
+      ctx.fillStyle = d.color.hair;
+      ctx.beginPath();
+      ctx.arc(x - 7, y - 14, 6.5, Math.PI, 0); ctx.fill();
+      ctx.fillRect(x - 13, y - 14, 12, 2);
+      // eyes (looking at screen)
+      ctx.fillStyle = '#0a0a0c';
+      ctx.beginPath(); ctx.arc(x - 4.5, y - 11, 0.8, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x - 9.0, y - 11, 0.8, 0, Math.PI * 2); ctx.fill();
+      // typing arm (animated)
+      ctx.strokeStyle = d.color.skin;
+      ctx.lineWidth = 3.6; ctx.lineCap = 'round';
+      const armY = y + 4 + type * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x - 2, y + 2);
+      ctx.lineTo(x + 4, armY);
+      ctx.stroke();
+      // keyboard hint (under monitor)
+      ctx.fillStyle = '#1f2937';
+      ctx.fillRect(x + 2, y + 23, 22, 2);
+      ctx.restore();
+    };
+
+    // pipeline funnel label between gates (small caption)
+    const drawFunnel = (x1, x2, label, color, yPos) => {
+      const cx = (x1 + x2) / 2;
+      ctx.font = '600 8px ui-monospace, "JetBrains Mono", monospace';
+      ctx.fillStyle = color + 'aa';
+      const tw = ctx.measureText(label).width;
+      ctx.fillText(label, cx - tw / 2, yPos);
+    };
+
     // ---- main loop ----
     const tick = () => {
       const now = performance.now();
       ctx.clearRect(0, 0, w, h);
 
       const prodX = w * PROD_X_FRAC;
+
+      // ---- devs (left side) ----
+      for (const d of devs) drawDev(d, now);
 
       // ---- gates (vivid colored test stations) ----
       ctx.setLineDash([6, 6]);
@@ -684,23 +781,24 @@
             if (dx*dx + dy*dy < SQUASH_R * SQUASH_R) killBug(b, 'squash');
           }
 
-          // gates: occasional ⚡ zap
+          // gates: stage-specific kill probabilities (UNIT/QA/STAGE)
           for (const g of gates) {
             if (b.state !== 'crawling') break;
             if (!b.passedGates.has(g.label) && b.x >= g.x && b.x <= g.x + b.vx + 1) {
               b.passedGates.add(g.label);
-              if (Math.random() < g.p) {
-                // electric arc spark
-                for (let k = 0; k < 6; k++) {
+              const killChance = b.stealth ? g.stealthP : g.p;
+              if (Math.random() < killChance) {
+                // electric arc spark on gate line
+                for (let k = 0; k < 7; k++) {
                   confetti.push({
                     x: g.x, y: b.y,
                     vx: (Math.random() - 0.5) * 3,
                     vy: (Math.random() - 0.5) * 3,
-                    t0: now, life: 350,
-                    color: '#0ea5e9', size: 1.6
+                    t0: now, life: 380,
+                    color: g.color, size: 1.7
                   });
                 }
-                killBug(b, 'zap', '#0ea5e9');
+                killBug(b, 'zap', g.color);
               }
             }
           }
