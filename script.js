@@ -300,10 +300,10 @@
         // stealthP = override for stealth bugs (lower = more survive)
         // owner: 'dev' (unit tests, written by devs) | 'qa' (QA-owned envs)
         { x: W * 0.38, label: 'UNIT',   caption: 'DEV UNIT TESTS', owner: 'dev', p: 0.12, stealthP: 0.05, color: '#0ea5e9' },
-        // QA ENV: catches plenty of regular bugs, but the hard-to-find ones slip past here
-        { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 0.55, stealthP: 0.06, color: '#f97316' },
-        // STAGE: where hard-to-find bugs get caught (stage-only reproductions) — kills almost all of them
-        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 0.85, stealthP: 0.46, color: '#a855f7' }
+        // QA ENV: lightweight gate — most bugs CROSS so the user can intercept them with the hammer in the QA->STAGE corridor
+        { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 0.08, stealthP: 0.04, color: '#f97316' },
+        // STAGE: the heavy net — kills ~99% of whatever made it this far (only ~1% slip into prod)
+        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 0.99, stealthP: 0.99, color: '#a855f7' }
       ];
       // devs at left edge (3 workstations) — each with a visible name tag
       const devY = [H * 0.22, H * 0.46, H * 0.70];
