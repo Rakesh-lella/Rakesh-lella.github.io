@@ -107,6 +107,9 @@
       }
       cr.classList.toggle('label', !!labelText);
       cr.classList.toggle('icon',  isIcon);
+      // hide the dot/trail and skip the ring's size transition so the hammer
+      // swap is instantaneous when you enter/leave a squash arena.
+      document.body.classList.toggle('cursor-icon-mode', isIcon);
     };
 
     // pointermove

@@ -419,6 +419,10 @@ body::after {
   transform-origin: 70% 80%;        /* pivot near the hammer handle */
   will-change: transform;
 }
+/* hammer-only mode: hide dot + trail, kill ring transitions so swap is instant */
+body.cursor-icon-mode .cursor-dot,
+body.cursor-icon-mode .cursor-trail { opacity: 0 !important; }
+body.cursor-icon-mode .cursor-ring { transition: none !important; }
 @keyframes hammer-strike {
   /* raise back, then swing forward (head down) to strike, small recoil, return */
   0%   { transform: rotate(0)      scale(1); }
