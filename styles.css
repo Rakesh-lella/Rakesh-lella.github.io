@@ -414,6 +414,20 @@ body::after {
   text-transform: none;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,.35));
 }
+.cursor-ring.label.icon .cr-text {
+  display: inline-block;
+  transform-origin: 70% 80%;        /* pivot near the hammer handle */
+  will-change: transform;
+}
+@keyframes hammer-strike {
+  0%   { transform: rotate(-30deg) scale(1); }
+  35%  { transform: rotate(45deg)  scale(1.18); }
+  60%  { transform: rotate(15deg)  scale(.95); }
+  100% { transform: rotate(0)      scale(1); }
+}
+.cursor-ring.label.icon.strike .cr-text {
+  animation: hammer-strike .34s cubic-bezier(.22,.9,.3,1.4);
+}
 /* drag/grab state (the bug arena) */
 .cursor-ring.grab {
   cursor: grabbing;

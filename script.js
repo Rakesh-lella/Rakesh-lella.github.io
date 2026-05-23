@@ -98,7 +98,13 @@
       const raw = txt || '';
       const isIcon = Object.prototype.hasOwnProperty.call(ICON_MAP, raw);
       labelText = isIcon ? ICON_MAP[raw] : raw;
-      cr.textContent = labelText;
+      cr.replaceChildren();
+      if (labelText) {
+        const sp = document.createElement('span');
+        sp.className = 'cr-text';
+        sp.textContent = labelText;
+        cr.appendChild(sp);
+      }
       cr.classList.toggle('label', !!labelText);
       cr.classList.toggle('icon',  isIcon);
     };
@@ -170,6 +176,14 @@
       // squeeze the ring
       cr.style.transform += ' scale(.85)';
       setTimeout(() => { /* reset handled by loop */ }, 120);
+      // hammer-strike animation when the cursor is in icon mode (🔨 over bug arenas)
+      if (cr.classList.contains('icon')) {
+        cr.classList.remove('strike');
+        // force reflow so re-adding the class re-triggers the keyframes
+        void cr.offsetWidth;
+        cr.classList.add('strike');
+        setTimeout(() => cr.classList.remove('strike'), 360);
+      }
     });
 
     // RAF loop
