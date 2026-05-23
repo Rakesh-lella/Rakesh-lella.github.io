@@ -299,11 +299,12 @@
         // p = kill probability for *non-stealth* bugs;
         // stealthP = override for stealth bugs (lower = more survive)
         // owner: 'dev' (unit tests, written by devs) | 'qa' (QA-owned envs)
-        { x: W * 0.38, label: 'UNIT',   caption: 'DEV UNIT TESTS', owner: 'dev', p: 0.12, stealthP: 0.05, color: '#0ea5e9' },
-        // QA ENV: catches plenty of regular bugs, but the hard-to-find ones slip past here
-        { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 0.55, stealthP: 0.06, color: '#f97316' },
-        // STAGE: where hard-to-find bugs get caught (stage-only reproductions) — kills almost all of them
-        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 0.85, stealthP: 0.46, color: '#a855f7' }
+        // Rates softened so the user has bugs left to hammer.
+        { x: W * 0.38, label: 'UNIT',   caption: 'DEV UNIT TESTS', owner: 'dev', p: 0.08, stealthP: 0.03, color: '#0ea5e9' },
+        // QA ENV: catches some, but plenty get through for you to whack
+        { x: W * 0.60, label: 'QA ENV', caption: 'QA TESTS',       owner: 'qa',  p: 0.28, stealthP: 0.04, color: '#f97316' },
+        // STAGE: catches most of what's left (stage-only repros)
+        { x: W * 0.80, label: 'STAGE',  caption: 'QA STAGE',       owner: 'qa',  p: 0.55, stealthP: 0.30, color: '#a855f7' }
       ];
       // devs at left edge (3 workstations) — each with a visible name tag
       const devY = [H * 0.22, H * 0.46, H * 0.70];
@@ -412,12 +413,13 @@
     c.addEventListener('pointerleave', () => { mx = -9999; my = -9999; });
     c.addEventListener('pointerdown', (e) => {
       const p = localPt(e);
-      const qaEnvX = gates.length > 1 ? gates[1].x : 0;
+      // user (the QA engineer with the hammer) can squash any bug, anywhere on screen.
+      // previously restricted to right of QA ENV, which made it almost impossible to land a hit
+      // because the automated gates / sentinels were killing every bug first.
       for (const b of bugs) {
         if (b.state !== 'crawling') continue;
-        if (b.x < qaEnvX) continue;    // QA only acts AFTER QA ENV line — guarding prod
         const dx = b.x - p.x, dy = b.y - p.y;
-        if (dx*dx + dy*dy < 110*110) killBug(b, 'squash', null, 'qa');
+        if (dx*dx + dy*dy < SQUASH_R * SQUASH_R) killBug(b, 'squash', null, 'qa');
       }
     });
 
