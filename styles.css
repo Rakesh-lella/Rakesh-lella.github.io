@@ -399,6 +399,21 @@ body::after {
   mix-blend-mode: normal;
   box-shadow: 0 8px 24px rgba(24,169,87,.32);
 }
+/* compact icon variant (e.g. hammer over bug arenas) — doesn't cover targets */
+.cursor-ring.label.icon {
+  width: 36px; height: 36px;
+  min-width: 0; min-height: 0;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  font-size: 26px;
+  line-height: 1;
+  text-align: center;
+  mix-blend-mode: normal;
+  text-transform: none;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.35));
+}
 /* drag/grab state (the bug arena) */
 .cursor-ring.grab {
   cursor: grabbing;

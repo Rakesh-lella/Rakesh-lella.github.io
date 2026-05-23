@@ -92,9 +92,15 @@
     const HOVER_SEL = 'a, button, input, textarea, select, [data-magnetic], [data-cursor]';
 
     const setLabel = (txt) => {
-      labelText = txt || '';
+      // map verbose labels to compact icons so the cursor doesn't cover targets
+      // (especially over the bug arenas where we need to see the bugs to click them).
+      const ICON_MAP = { squash: '🔨' };
+      const raw = txt || '';
+      const isIcon = Object.prototype.hasOwnProperty.call(ICON_MAP, raw);
+      labelText = isIcon ? ICON_MAP[raw] : raw;
       cr.textContent = labelText;
       cr.classList.toggle('label', !!labelText);
+      cr.classList.toggle('icon',  isIcon);
     };
 
     // pointermove
