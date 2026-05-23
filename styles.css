@@ -420,9 +420,11 @@ body::after {
   will-change: transform;
 }
 @keyframes hammer-strike {
-  0%   { transform: rotate(-30deg) scale(1); }
-  35%  { transform: rotate(45deg)  scale(1.18); }
-  60%  { transform: rotate(15deg)  scale(.95); }
+  /* raise back, then swing forward (head down) to strike, small recoil, return */
+  0%   { transform: rotate(0)      scale(1); }
+  20%  { transform: rotate(45deg)  scale(1.05); }   /* wind up — handle back */
+  55%  { transform: rotate(-55deg) scale(1.18); }   /* strike — head slams down */
+  75%  { transform: rotate(-25deg) scale(.95); }    /* recoil */
   100% { transform: rotate(0)      scale(1); }
 }
 .cursor-ring.label.icon.strike .cr-text {
